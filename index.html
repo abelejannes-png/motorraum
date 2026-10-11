@@ -1,0 +1,1271 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Motorraum">
+<meta name="theme-color" content="#060a10">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Motorraum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: mobile app shell — sticky header, scrolling view, fixed tab bar; detail sheets slide over. Single dark "hologram bay" look by design. */
+:root{
+  --bg:#060a10; --panel:#0c141e; --panel2:#111c29; --line:#1c2b3c;
+  --fg:#e4eef6; --muted:#8397aa; --holo:#5fe3ff; --holo-dim:rgba(95,227,255,.14);
+  --amber:#ffb648; --ok:#57e39a; --bad:#ff6b6b;
+  --f-display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--holo);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance;line-height:1.1}
+.app{max-width:560px;margin:0 auto;min-height:100%;padding-inline:16px;padding-block:0 calc(84px + env(safe-area-inset-bottom,0px))}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:linear-gradient(var(--bg) 70%,transparent);display:flex;align-items:center;justify-content:space-between;padding-block:14px 10px}
+.brand{font-family:var(--f-display);font-size:26px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.brand b{color:var(--holo)}
+.stats{display:flex;gap:8px;font-family:var(--f-mono);font-size:13px}
+.stat{display:flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);border-radius:99px;background:var(--panel)}
+.stat i{font-style:normal;color:var(--amber)}
+.label{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+
+/* tab bar */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(8,13,20,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+.tab{padding:10px 0 12px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;color:var(--muted);font-weight:500}
+.tab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7}
+.tab[aria-selected="true"]{color:var(--holo)}
+
+/* stage (hologram) */
+.stage{position:relative;height:min(46vh,380px);border-radius:18px;overflow:hidden;background:radial-gradient(ellipse 70% 55% at 50% 85%,rgba(95,227,255,.13),transparent 70%),linear-gradient(#08111b,#050910);border:1px solid var(--line);touch-action:none}
+.stage canvas{display:block;width:100%;height:100%}
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(transparent 0 2px,rgba(95,227,255,.035) 2px 3px)}
+.stage.small{height:200px}
+.hud{position:absolute;left:12px;top:10px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;z-index:2}
+.hud .h1{font-family:var(--f-display);font-size:22px;font-weight:700;color:var(--holo);text-shadow:0 0 12px rgba(95,227,255,.5);line-height:1.1}
+.hud .h2{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:2px}
+.pick{position:absolute;left:50%;bottom:56px;transform:translateX(-50%);z-index:2;font-family:var(--f-mono);font-size:12px;padding:6px 12px;border-radius:99px;background:rgba(6,10,16,.85);border:1px solid var(--holo);color:var(--holo);white-space:nowrap;transition:opacity .25s}
+.pick.hide{opacity:0}
+.ctrl{position:absolute;right:10px;bottom:10px;z-index:3;display:flex;gap:6px}
+.ctrl button{width:36px;height:36px;border-radius:10px;background:rgba(6,10,16,.8);border:1px solid var(--line);display:grid;place-items:center;font-family:var(--f-mono);font-size:12px}
+.ctrl button[aria-pressed="true"]{border-color:var(--holo);color:var(--holo)}
+.sbtns{position:absolute;left:10px;bottom:10px;z-index:3;display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 110px)}
+.sbtns button{min-width:36px;height:36px;padding:0 10px;border-radius:10px;background:rgba(6,10,16,.8);border:1px solid var(--line);font-family:var(--f-mono);font-size:13px;touch-action:none;user-select:none;-webkit-user-select:none}
+.sbtns button[aria-pressed="true"]{border-color:var(--holo);color:var(--holo);background:rgba(95,227,255,.12)}
+.sbtns button.big{padding:0 18px;font-weight:500}
+.hint{position:absolute;left:12px;bottom:14px;z-index:2;font-family:var(--f-mono);font-size:10.5px;color:var(--muted);pointer-events:none}
+
+/* learn path */
+.hero{margin-top:4px}
+.hero .stage{height:190px}
+.hero-txt{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:14px 2px 2px}
+.hero-txt h1{font-size:30px}
+.unit{margin-top:26px}
+.unit-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+.unit-head h2{font-size:20px}
+.path{display:flex;flex-direction:column;align-items:center;gap:14px;padding:22px 0 6px}
+.node{display:flex;flex-direction:column;align-items:center;gap:6px;width:150px}
+.node .dot{width:66px;height:66px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--line);background:var(--panel2);font-family:var(--f-display);font-size:24px;font-weight:700;color:var(--muted);position:relative}
+.node .nm{font-size:13px;text-align:center;line-height:1.25;color:var(--muted)}
+.node.done .dot{border-color:var(--ok);color:var(--ok);background:rgba(87,227,154,.08)}
+.node.done .nm{color:var(--fg)}
+.node.current .dot{border-color:var(--holo);color:var(--bg);background:var(--holo);box-shadow:0 0 0 6px var(--holo-dim),0 0 26px rgba(95,227,255,.45)}
+.node.current .nm{color:var(--fg);font-weight:600}
+.node.locked{opacity:.55}
+.node.soon .dot{border-style:dashed}
+@media (prefers-reduced-motion:no-preference){.node.current .dot{animation:pulse 2.2s ease-in-out infinite}}
+@keyframes pulse{50%{box-shadow:0 0 0 11px rgba(95,227,255,.06),0 0 30px rgba(95,227,255,.6)}}
+
+/* cards / lists */
+.sec{margin-top:24px}
+.sec h2{font-size:22px;margin-bottom:4px}
+.sec>p{margin:0 0 12px;color:var(--muted);max-width:60ch}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);min-width:0}
+.card h3{font-size:20px}
+.card p{margin:0;font-size:13px;color:var(--muted);line-height:1.4}
+.card:active{border-color:var(--holo)}
+.glyph{width:42px;height:42px;stroke:var(--holo);fill:none;stroke-width:1.6}
+.chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--f-mono);font-size:11px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip.holo{border-color:rgba(95,227,255,.5);color:var(--holo)}
+.chip.amber{border-color:rgba(255,182,72,.5);color:var(--amber)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;margin-bottom:10px}
+.search:focus{outline:none;border-color:var(--holo)}
+.car-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);width:100%;text-align:left}
+.car-row+.car-row{margin-top:8px}
+.car-row .info{flex:1;min-width:0}
+.car-row h3{font-size:19px}
+.car-row .sub{font-size:12.5px;color:var(--muted)}
+.pin{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;border:1px solid var(--line);flex:none}
+.pin svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}
+.pin[aria-pressed="true"]{color:var(--amber);border-color:rgba(255,182,72,.6);background:rgba(255,182,72,.08)}
+.pin[aria-pressed="true"] svg{fill:currentColor}
+.garage{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gcard{position:relative;padding:14px;border-radius:16px;text-align:left;background:linear-gradient(160deg,rgba(95,227,255,.10),rgba(95,227,255,.02) 60%),var(--panel);border:1px solid rgba(95,227,255,.35);display:flex;flex-direction:column;gap:4px;min-width:0}
+.gcard h3{font-size:21px}
+.gcard .sub{font-size:12.5px;color:var(--muted)}
+.empty{padding:18px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);font-size:14px}
+
+/* sheet (lesson + details) */
+.sheet{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sheet-in{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:calc(env(safe-area-inset-top,0px) + 10px) calc(110px + env(safe-area-inset-bottom,0px))}
+.sheet-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.x{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);display:grid;place-items:center;flex:none}
+.x svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none}
+.bar{flex:1;height:10px;border-radius:99px;background:var(--panel2);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--holo);border-radius:99px;box-shadow:0 0 12px rgba(95,227,255,.6);transition:width .35s}
+.step h2{font-size:26px;margin:16px 0 8px}
+.step p{margin:0 0 10px;max-width:62ch;font-size:16px}
+.step strong{color:var(--holo);font-weight:600}
+.chain{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 4px;font-family:var(--f-mono);font-size:12px}
+.chain span{padding:4px 8px;border:1px solid rgba(95,227,255,.45);border-radius:8px;color:var(--holo)}
+.chain em{font-style:normal;color:var(--muted)}
+.opts{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.opt{text-align:left;padding:14px 16px;border-radius:14px;border:2px solid var(--line);background:var(--panel);font-size:16px}
+.opt[aria-pressed="true"]{border-color:var(--holo);background:rgba(95,227,255,.07)}
+.opt.right{border-color:var(--ok);background:rgba(87,227,154,.1)}
+.opt.wrong{border-color:var(--bad);background:rgba(255,107,107,.1)}
+.foot{position:fixed;left:0;right:0;bottom:0;z-index:45;border-top:1px solid var(--line);background:var(--bg);padding-bottom:env(safe-area-inset-bottom,0px)}
+.foot.good{background:#0b1f17;border-color:rgba(87,227,154,.4)}
+.foot.bad{background:#241012;border-color:rgba(255,107,107,.4)}
+.foot-in{max-width:560px;margin:0 auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.fb{font-size:14.5px}
+.fb b{display:block;font-family:var(--f-display);font-size:20px}
+.foot.good .fb b{color:var(--ok)}.foot.bad .fb b{color:var(--bad)}
+.btn{width:100%;padding:15px;border-radius:14px;background:var(--holo);color:#04121a;font-weight:600;font-size:16px;letter-spacing:.02em}
+.btn:disabled{background:var(--panel2);color:var(--muted)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.done-wrap{text-align:center;padding-top:40px}
+.done-wrap .big{font-family:var(--f-display);font-size:64px;font-weight:700;color:var(--holo);text-shadow:0 0 24px rgba(95,227,255,.5);line-height:1}
+.detail h1{font-size:34px}
+.detail .lede{color:var(--muted);margin:4px 0 14px}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:6px}
+.spec dt,.spec dd{margin:0;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px}
+.spec dt{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--panel);padding-top:13px}
+.spec dd{min-width:0}
+.spec dt:nth-last-of-type(1),.spec dd:last-child{border-bottom:0}
+.spec a,.link{color:var(--holo);text-decoration:none;border-bottom:1px solid rgba(95,227,255,.35);cursor:pointer}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
+.seg button{padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:13.5px}
+.seg button[aria-pressed="true"]{border-color:var(--holo);color:var(--holo);background:rgba(95,227,255,.07)}
+ul.plain{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+ul.plain li{padding:11px 13px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:14px}
+ul.plain li b{display:block;font-weight:600;margin-bottom:1px}
+ul.warn li{border-left:3px solid var(--amber)}
+details{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-top:8px}
+summary{padding:12px 14px;font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+summary::after{content:"+";font-family:var(--f-mono);color:var(--holo)}
+details[open] summary::after{content:"–"}
+details ol{margin:0;padding:0 16px 14px 34px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+details .note{padding:0 14px 14px;font-size:13px;color:var(--muted)}
+.pros{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.pros div{padding:12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:13.5px;min-width:0}
+.pros ul{margin:6px 0 0;padding-left:18px}
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--panel2);border:1px solid var(--holo);color:var(--fg);padding:9px 16px;border-radius:99px;font-size:13.5px;white-space:nowrap}
+
+/* glossary */
+.term{display:inline;padding:0;font:inherit;color:inherit;border-bottom:1.5px dotted var(--holo);cursor:help;text-align:inherit;line-height:inherit}
+.term:hover{background:var(--holo-dim)}
+.gback{position:fixed;inset:0;z-index:80;background:rgba(2,5,9,.62);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+.gpop{width:100%;max-width:520px;background:var(--panel2);border:1px solid rgba(95,227,255,.5);border-radius:18px;padding:16px 16px 14px;box-shadow:0 0 40px rgba(95,227,255,.15)}
+.gpop h3{font-size:24px;color:var(--holo);margin:2px 0 6px}
+.gpop p{margin:0 0 12px;font-size:15.5px;max-width:60ch}
+.gpop .row{display:flex;gap:8px;flex-wrap:wrap}
+.gpop .row .btn{width:auto;flex:1;padding:12px;font-size:14.5px}
+.pick{cursor:pointer}
+.lex{display:flex;flex-wrap:wrap;gap:6px}
+.lex .term{border:1px solid var(--line);border-radius:99px;padding:4px 10px;font-size:13px;background:var(--panel)}
+@media (max-width:380px){.grid,.garage,.pros{grid-template-columns:1fr}}
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">Motor<b>raum</b></div>
+    <div class="stats"><span class="stat" title="Tage in Folge"><i>▲</i><span id="st-streak">0</span></span><span class="stat" title="Erfahrungspunkte"><span id="st-xp">0</span> XP</span></div>
+  </header>
+  <main id="view"></main>
+</div>
+<nav class="tabs" aria-label="Bereiche"><div class="tabs-in">
+  <button class="tab" data-tab="learn" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M4 19V8l8-4 8 4v11"/><path d="M8 19v-6h8v6"/></svg>Lernen</button>
+  <button class="tab" data-tab="motors" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="5" y="8" width="11" height="9" rx="1"/><path d="M16 11h3v3h-3M8 8V5h5v3M5 12H3"/></svg>Motoren</button>
+  <button class="tab" data-tab="garage" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 11l9-6 9 6v9H3z"/><path d="M7 20v-5h10v5"/></svg>Garage</button>
+</div></nav>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* ============ STATE ============ */
+const KEY="motorraum.v1";
+const defaults={done:[],xp:0,streak:0,lastDay:null,pinned:["vw-t3","audi-80"],variant:{}};
+let S=load();
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s)return Object.assign({},defaults,s)}catch(e){}return JSON.parse(JSON.stringify(defaults))}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}updateStats()}
+function updateStats(){document.getElementById("st-xp").textContent=S.xp;document.getElementById("st-streak").textContent=S.streak}
+function dayStr(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ============ CONTENT: LESSONS ============ */
+const UNITS=[
+ {id:"u1",name:"Das große Ganze",sub:"Einheit 1",lessons:["l1","l2","l3"]},
+ {id:"u2",name:"Motoren verstehen",sub:"Einheit 2",lessons:["l4","l5"]},
+ {id:"u3",name:"Kraft auf die Straße",sub:"Einheit 3",lessons:["l6","l7","l8"]},
+ {id:"u4",name:"Am Leben halten",sub:"Einheit 4",lessons:["l9","l10","l11"]},
+ {id:"u5",name:"Fahren & Anhalten",sub:"Einheit 5",lessons:["l12","l13"]}
+];
+const SOON={};
+const DT={scene:"drivetrain"};
+const LESSONS={
+ l1:{title:"Was ist ein Auto?",steps:[
+  {...DT,h:"Energie rein, Bewegung raus",t:"<p>Ein Auto macht aus Energie Bewegung. Im Tank steckt die Energie, am Ende drehen sich die Räder.</p><p>Dazwischen sitzt eine Kette von Bauteilen. Sie heißt <strong>Antriebsstrang</strong>.</p>"},
+  {...DT,h:"Die Kette",t:"<div class='chain'><span>Motor</span><em>→</em><span>Kupplung</span><em>→</em><span>Getriebe</span><em>→</em><span>Welle</span><em>→</em><span>Differential</span><em>→</em><span>Räder</span></div><p>Der Lichtpunkt im Hologramm zeigt, wie die Kraft wandert. Tippe ein Teil an, dann siehst du seinen Namen.</p>"},
+  {...DT,h:"Wer macht was?",t:"<p>Der <strong>Motor</strong> erzeugt Drehung. Die <strong>Kupplung</strong> kann ihn vom Rest trennen, zum Beispiel beim Anfahren und beim Schalten.</p><p>Das <strong>Getriebe</strong> legt fest, wie schnell sich die Räder im Verhältnis zum Motor drehen. Das sind die Gänge.</p>"},
+  {q:"Was sitzt direkt hinter dem Motor?",o:["Das Getriebe","Die Kupplung","Das Differential"],a:1,e:"Die Kupplung sitzt zwischen Motor und Getriebe. Nur so kann sie den Motor vom Getriebe trennen."},
+  {...DT,h:"Das Differential",t:"<p>In einer Kurve fährt das äußere Rad einen längeren Weg als das innere. Also muss es sich schneller drehen.</p><p>Das <strong>Differential</strong> verteilt die Kraft auf beide Räder und lässt sie trotzdem unterschiedlich schnell drehen.</p>"},
+  {q:"Warum hat ein Auto ein Getriebe?",o:["Damit der Motor Strom erzeugt","Damit Motor- und Raddrehzahl zur Geschwindigkeit passen","Damit das Auto bremsen kann"],a:1,e:"Ein Motor arbeitet nur in einem bestimmten Drehzahlbereich gut. Mit den Gängen passt das Getriebe die Raddrehzahl daran an."},
+  {q:"Wozu braucht man das Differential?",o:["Damit sich die Räder in der Kurve unterschiedlich schnell drehen können","Damit der Motor kühl bleibt","Damit man rückwärts fahren kann"],a:0,e:"Ohne Differential würde ein Rad in jeder Kurve radieren oder springen."}
+ ]},
+ l2:{title:"Der Motor im Prinzip",steps:[
+  {scene:"piston",h:"Druck schiebt den Kolben",t:"<p>Fast jeder Verbrennungsmotor funktioniert gleich. In einem <strong>Zylinder</strong> verbrennt ein Gemisch aus Luft und Kraftstoff.</p><p>Der Druck schiebt den <strong>Kolben</strong> nach unten.</p>"},
+  {scene:"piston",h:"Wie beim Fahrradpedal",t:"<p>Der Kolben hängt an der <strong>Pleuelstange</strong>. Die sitzt außermittig an der <strong>Kurbelwelle</strong>, so wie dein Bein am Pedal.</p><p>So wird aus Auf-und-Ab eine Drehung. Tippe die Teile im Hologramm an.</p>"},
+  {q:"Welches Teil macht aus dem Auf und Ab eine Drehung?",o:["Der Kolben","Die Kurbelwelle","Der Zylinder"],a:1,e:"Die Kurbelwelle hat versetzte Zapfen. Daran zieht und drückt die Pleuelstange und dreht sie so."},
+  {scene:"piston",h:"OT, UT und Hubraum",t:"<p>Der höchste Punkt des Kolbens heißt <strong>oberer Totpunkt (OT)</strong>, der tiefste <strong>unterer Totpunkt (UT)</strong>.</p><p>Der Raum dazwischen, mal Anzahl der Zylinder, ist der <strong>Hubraum</strong>. Er steht in deinem Fahrzeugschein unter <strong>P.1</strong>, in cm³.</p>"},
+  {q:"Im Fahrzeugschein steht unter P.1: 1781 cm³. Was ist das?",o:["Das Leergewicht","Der Hubraum","Die Leistung"],a:1,e:"P.1 ist der Hubraum. 1781 cm³ sind etwa 1,8 Liter. Die Leistung steht unter P.2, in kW."},
+  {q:"Wie heißt die Stange zwischen Kolben und Kurbelwelle?",o:["Nockenwelle","Pleuelstange","Antriebswelle"],a:1,e:"Die Pleuelstange, kurz Pleuel, verbindet den Kolben mit der Kurbelwelle."}
+ ]},
+ l3:{title:"Der Viertakt",steps:[
+  {scene:"fourstroke",h:"Vier Schritte, zwei Umdrehungen",t:"<p>Ein Benzinmotor arbeitet in vier Schritten, den <strong>Takten</strong>. Dabei dreht sich die Kurbelwelle zweimal, also um 720 Grad.</p><p>Oben im Hologramm siehst du, welcher Takt gerade läuft. Mit <b>½</b> wird es langsamer.</p>"},
+  {scene:"fourstroke",h:"1 · Ansaugen",t:"<p>Der Kolben geht nach unten. Das <strong>Einlassventil</strong> ist offen, frisches Gemisch aus Luft und Benzin strömt in den Zylinder.</p>"},
+  {scene:"fourstroke",h:"2 · Verdichten",t:"<p>Beide Ventile sind zu. Der Kolben geht nach oben und drückt das Gemisch auf einen Bruchteil zusammen. Dadurch wird es heiß und verbrennt später besser.</p>"},
+  {scene:"fourstroke",h:"3 · Arbeiten",t:"<p>Kurz vor dem OT zündet die <strong>Zündkerze</strong>. Das Gemisch verbrennt explosionsartig, der Druck schiebt den Kolben nach unten.</p><p>Nur in diesem Takt entsteht Kraft. Die anderen drei laufen mit Schwung mit.</p>"},
+  {scene:"fourstroke",h:"4 · Ausstoßen",t:"<p>Das <strong>Auslassventil</strong> öffnet. Der Kolben geht hoch und schiebt das Abgas in den Auspuff. Danach beginnt alles von vorn.</p>"},
+  {q:"In welchem Takt entsteht die Kraft?",o:["Ansaugen","Verdichten","Arbeiten","Ausstoßen"],a:2,e:"Im Arbeitstakt drückt das verbrennende Gemisch den Kolben nach unten. Das ist der einzige Takt, der Kraft liefert."},
+  {q:"Was passiert beim Verdichten?",o:["Das Gemisch wird zusammengedrückt","Abgas strömt hinaus","Beide Ventile öffnen"],a:0,e:"Beide Ventile sind zu, der Kolben drückt das Gemisch zusammen."},
+  {q:"Wie oft dreht sich die Kurbelwelle für alle vier Takte?",o:["Einmal","Zweimal","Viermal"],a:1,e:"Jeder Takt ist eine halbe Umdrehung. Vier Takte sind zwei Umdrehungen, also 720°."}
+ ]},
+ l4:{title:"Benzin oder Diesel?",steps:[
+  {scene:"fourstroke",opts:{fuel:"benzin"},h:"Benziner: der Funke",t:"<p>Beim Benziner zündet die <strong>Zündkerze</strong> das verdichtete Gemisch mit einem Funken. Das nennt man <strong>Fremdzündung</strong>.</p>"},
+  {scene:"fourstroke",opts:{fuel:"diesel"},h:"Diesel: Hitze durch Druck",t:"<p>Ein Diesel hat keine Zündkerze. Er saugt nur Luft an und drückt sie so stark zusammen, dass sie mehrere hundert Grad heiß wird.</p><p>Dann spritzt die <strong>Einspritzdüse</strong> Diesel hinein, und der entzündet sich von selbst. Das ist die <strong>Selbstzündung</strong>.</p>"},
+  {scene:"fourstroke",opts:{fuel:"diesel"},h:"Was daraus folgt",t:"<p>Ein Diesel verdichtet viel stärker: etwa 16:1 bis 23:1. Ältere Benziner liegen etwa bei 8:1 bis 11:1.</p><p>Darum ist der Diesel sparsam und hat viel Kraft bei niedriger Drehzahl. Er ist aber schwerer und dreht nicht so hoch.</p><p>Bei kaltem Motor helfen <strong>Glühkerzen</strong> beim Start. Deshalb wartest du beim alten Diesel aufs Vorglühen.</p>"},
+  {q:"Was zündet den Kraftstoff im Diesel?",o:["Die Zündkerze","Die Hitze der stark verdichteten Luft","Die Batterie direkt"],a:1,e:"Selbstzündung: Die Luft ist durch die Verdichtung so heiß, dass der eingespritzte Diesel von allein brennt."},
+  {q:"Wofür ist die Glühkerze da?",o:["Für den Kaltstart","Für das Licht","Für die Kühlung"],a:0,e:"Sie heizt den Brennraum vor, solange der Motor kalt ist. Danach reicht die Verdichtungshitze."},
+  {q:"Welcher Motor verdichtet stärker?",o:["Der Benziner","Der Diesel","Beide gleich"],a:1,e:"Der Diesel braucht die hohe Verdichtung, sonst wird die Luft nicht heiß genug."}
+ ]},
+ l6:{title:"Die Kupplung",steps:[
+  {scene:"clutch",h:"Warum man trennen muss",t:"<p>Ein Verbrennungsmotor muss immer drehen, im Leerlauf etwa 800 bis 900 U/min. Beim Anfahren stehen die Räder aber still.</p><p>Wäre der Motor fest mit den Rädern verbunden, würde er sofort absterben. Die <strong>Kupplung</strong> löst das: Sie kann Motor und Getriebe trennen und weich wieder verbinden.</p>"},
+  {scene:"clutch",h:"Der Aufbau",t:"<p>An der Kurbelwelle sitzt das schwere <strong>Schwungrad</strong>. Davor liegt die <strong>Kupplungsscheibe</strong> mit dem <strong>Reibbelag</strong>, sie steckt auf der Getriebeeingangswelle.</p><p>Die <strong>Druckplatte</strong> presst die Scheibe mit einer starken <strong>Membranfeder</strong> gegen das Schwungrad. Dann dreht sich alles gemeinsam.</p>"},
+  {scene:"clutch",h:"Pedal treten",t:"<p>Trittst du das Pedal, drückt das <strong>Ausrücklager</strong> auf die Federzungen. Die Druckplatte hebt ab, die Scheibe ist frei.</p><p>Der Motor dreht weiter, das Getriebe bleibt stehen. <b>Halte im Hologramm den Knopf „Pedal“ gedrückt</b> und schau auf die Drehzahlen oben.</p>"},
+  {scene:"clutch",h:"Der Schleifpunkt",t:"<p>Lässt du das Pedal langsam kommen, berührt der Belag zuerst nur leicht. Er rutscht und nimmt die Scheibe allmählich mit. Das ist der <strong>Schleifpunkt</strong>, so fährst du sanft an.</p><p>Beim Rutschen nutzt sich der Reibbelag ab. Darum das Pedal nicht lange schleifen lassen.</p>"},
+  {q:"Was passiert, wenn du das Kupplungspedal ganz trittst?",o:["Der Motor geht aus","Motor und Getriebe sind getrennt","Das Auto bremst"],a:1,e:"Die Druckplatte hebt ab, die Scheibe ist frei. Der Motor dreht weiter, das Getriebe nicht."},
+  {q:"Welches Teil presst die Kupplungsscheibe ans Schwungrad?",o:["Die Druckplatte","Das Ausrücklager","Der Kolben"],a:0,e:"Die Druckplatte mit ihrer Membranfeder presst die Scheibe fest. Das Ausrücklager löst sie nur."},
+  {q:"Was verschleißt bei der Kupplung mit der Zeit?",o:["Das Schwungrad","Der Reibbelag","Die Kurbelwelle"],a:1,e:"Der Reibbelag wird bei jedem Anfahren etwas dünner. Ist er runter, rutscht die Kupplung durch."},
+  {scene:"clutch",h:"Bei deinem T3",t:"<p>Weil der Motor gerade draußen ist, siehst du hinten am Getriebe die <strong>Kupplungsglocke</strong> mit dem Ausrücklager.</p><p>Schwungrad, Druckplatte und Scheibe sitzen am Motor und sind mit ihm ausgebaut. Wenn ein neuer Motor reinkommt, ist das ein guter Moment, die Kupplung gleich mitzuerneuern.</p>"}
+ ]},
+ l7:{title:"Getriebe & Gänge",steps:[
+  {scene:"gearbox",h:"Warum Gänge?",t:"<p>Ein Motor arbeitet gut in einem schmalen Bereich, etwa zwischen 1500 und 5500 U/min. Die Räder müssen aber von 0 bis Autobahntempo drehen.</p><p>Das <strong>Getriebe</strong> verbindet beides, mit verschiedenen <strong>Übersetzungen</strong>, den Gängen.</p>"},
+  {scene:"gearbox",h:"Wie beim Fahrrad",t:"<p>Treibt ein kleines Zahnrad ein großes an, dreht das große langsamer, aber mit mehr Kraft. Diese Drehkraft heißt <strong>Drehmoment</strong>.</p><p>Im 1. Gang treibt ein kleines Rad ein großes: viel Kraft zum Anfahren. Im 4. Gang ist es umgekehrt: wenig Kraft, viel Tempo.</p><p>Tippe im Hologramm auf <b>N, 1, 2, 3, 4</b> und vergleiche.</p>"},
+  {scene:"gearbox",h:"Was die Zahl bedeutet",t:"<p>Eine Übersetzung von <strong>2,33 : 1</strong> heißt: Der Motor dreht sich 2,33-mal, bis sich die Abtriebswelle einmal dreht.</p><p>Bei <strong>1 : 1</strong> drehen beide gleich schnell. Liegt die Zahl unter 1, dreht der Ausgang sogar schneller als der Motor. Das ist ein Spargang.</p>"},
+  {scene:"gearbox",h:"Was beim Schalten passiert",t:"<p>Im Schaltgetriebe sind alle Zahnradpaare immer im Eingriff. Die unteren Räder, die <strong>Losräder</strong>, drehen aber lose auf ihrer Welle.</p><p>Beim Schalten schiebt die <strong>Schaltmuffe</strong> ein Losrad fest an die Welle. Vorher gleichen <strong>Synchronringe</strong> die Drehzahlen an. Deshalb kracht es nicht, wenn du richtig kuppelst.</p><p>Das Hologramm ist vereinfacht. Echte Getriebe haben noch eine dritte Welle und mehr Gänge.</p>"},
+  {scene:"gearbox",h:"Rückwärts",t:"<p>Für den <strong>Rückwärtsgang</strong> sitzt ein drittes Zahnrad dazwischen, das <strong>Zwischenrad</strong>. Es dreht die Richtung um.</p>"},
+  {q:"In welchem Gang kommt die meiste Kraft am Rad an?",o:["Im 1. Gang","Im 4. Gang","Im Leerlauf"],a:0,e:"Der 1. Gang hat die größte Übersetzung. Die Räder drehen langsam, dafür mit viel Drehmoment."},
+  {q:"Was heißt Übersetzung 2 : 1?",o:["Der Motor dreht zweimal, die Welle einmal","Die Welle dreht doppelt so schnell","Zwei Gänge sind eingelegt"],a:0,e:"Erst die Motorumdrehungen, dann die Umdrehungen am Ausgang."},
+  {q:"Warum kracht es beim Schalten normalerweise nicht?",o:["Weil die Synchronringe die Drehzahl angleichen","Weil der Motor ausgeht","Weil das Getriebe leer ist"],a:0,e:"Die Synchronringe bremsen oder beschleunigen das Losrad, bis es zur Welle passt. Erst dann rastet die Schaltmuffe ein."},
+  {q:"Wodurch fährt das Auto rückwärts?",o:["Der Motor dreht andersrum","Ein Zwischenrad kehrt die Drehrichtung um","Die Kupplung dreht sich um"],a:1,e:"Der Motor dreht immer in dieselbe Richtung. Das Zwischenrad im Rückwärtsgang kehrt sie um."}
+ ]},
+ l8:{title:"Das Differential",steps:[
+  {scene:"diff",h:"Zwei Räder, zwei Wege",t:"<p>In einer Kurve fährt das äußere Rad einen größeren Bogen als das innere. Es muss sich schneller drehen.</p><p>Beide hängen aber am selben Antrieb. Das <strong>Differential</strong> macht beides möglich.</p>"},
+  {scene:"diff",h:"Der Aufbau",t:"<p>Die Kardanwelle oder das Getriebe treibt ein kleines <strong>Kegelrad</strong>. Das dreht das große <strong>Tellerrad</strong>, und damit das <strong>Ausgleichsgehäuse</strong>.</p><p>Im Gehäuse sitzen zwei kleine <strong>Ausgleichskegelräder</strong>. Sie greifen in die beiden <strong>Achswellenräder</strong>, und die führen zu den Rädern.</p>"},
+  {scene:"diff",h:"Geradeaus und Kurve",t:"<p>Geradeaus stehen die Ausgleichskegelräder still. Das Gehäuse dreht sich wie ein Block, beide Räder gleich schnell.</p><p>In der Kurve fangen sie an zu drehen. Was das eine Rad langsamer wird, wird das andere schneller. Tippe im Hologramm auf <b>↑, ↰ und ↱</b>.</p>"},
+  {scene:"diff",h:"Der Haken",t:"<p>Das Differential schickt die Kraft dahin, wo es am leichtesten geht. Steht ein Rad auf Eis, dreht es durch, und das andere bekommt kaum Kraft.</p><p>Dagegen hilft eine <strong>Differenzialsperre</strong>. Sie verbindet beide Seiten fest. Beim T3 Syncro gab es sie auf Wunsch für die Hinterachse.</p><p>Bei deinem T3 und beim Audi 80 steckt das Differential übrigens direkt im Getriebegehäuse.</p>"},
+  {q:"Welches Rad dreht in einer Linkskurve schneller?",o:["Das linke","Das rechte","Beide gleich"],a:1,e:"In der Linkskurve ist das rechte Rad außen. Es fährt den größeren Bogen und dreht schneller."},
+  {q:"Was tun die Ausgleichskegelräder bei Geradeausfahrt?",o:["Sie drehen sich schnell","Sie stehen still im Gehäuse","Sie bremsen die Räder"],a:1,e:"Sie drehen nur mit dem Gehäuse mit, aber nicht um sich selbst. Erst in der Kurve gleichen sie aus."},
+  {q:"Was passiert ohne Sperre, wenn ein Rad auf Eis steht?",o:["Es dreht durch, das andere bekommt kaum Kraft","Beide Räder greifen gleich gut","Der Motor geht aus"],a:0,e:"Die Kraft geht den leichtesten Weg. Eine Differenzialsperre verhindert das."}
+ ]},
+ l9:{title:"Die Kühlung",steps:[
+  {scene:"cooling",h:"Wohin mit der Hitze?",t:"<p>Nur etwa ein Drittel der Energie im Kraftstoff wird zu Bewegung. Der Rest ist Wärme. Ein Teil geht mit dem Abgas raus, den Rest muss die <strong>Kühlung</strong> abführen.</p><p>Ohne Kühlung würde der Motor in wenigen Minuten überhitzen und Schaden nehmen.</p>"},
+  {scene:"cooling",h:"Der Kreislauf",t:"<p>Die <strong>Wasserpumpe</strong> drückt <strong>Kühlmittel</strong> durch Kanäle im Motorblock und im Zylinderkopf. Dort nimmt es die Wärme auf.</p><p>Dann fließt es zum <strong>Kühler</strong> vorne am Auto. Der Fahrtwind kühlt es ab, und es geht zurück zum Motor. Im Stand hilft ein <strong>Lüfter</strong>.</p>"},
+  {scene:"cooling",h:"Der Thermostat",t:"<p>Ein kalter Motor verschleißt schneller und braucht mehr Kraftstoff. Darum hält der <strong>Thermostat</strong> den Weg zum Kühler zuerst geschlossen. Das Kühlmittel fließt im kleinen Kreislauf nur durch den Motor.</p><p>Bei etwa 85 bis 90 °C öffnet er. Schau im Hologramm auf die Temperatur. Mit <b>Kaltstart</b> geht es von vorne los.</p>"},
+  {scene:"cooling",h:"Unter Druck",t:"<p>Das System steht unter leichtem Überdruck. Dadurch kocht das Kühlmittel erst weit über 100 °C. Der <strong>Ausgleichsbehälter</strong> nimmt auf, was sich beim Erwärmen ausdehnt.</p><p><b>Wichtig:</b> Den Deckel nie bei heißem Motor öffnen. Kochendes Kühlmittel kann herausspritzen.</p>"},
+  {scene:"cooling",h:"Luftgekühlt",t:"<p>Der Käfer und der T3 bis 1983 kommen ohne Wasser aus. Ein <strong>Gebläse</strong> bläst Luft über Rippen an den Zylindern. Das Motoröl hilft beim Kühlen mit.</p><p>Beim Wasserboxer im T3 sitzt der Kühler vorne und der Motor hinten. Dazwischen laufen lange Leitungen. Deshalb ist das <strong>Entlüften</strong> dort besonders wichtig.</p>"},
+  {q:"Was macht der Thermostat bei kaltem Motor?",o:["Er hält den Weg zum Kühler geschlossen","Er schaltet den Motor ab","Er heizt das Kühlmittel"],a:0,e:"So wird der Motor schneller warm. Erst bei Betriebstemperatur öffnet er den Weg zum Kühler."},
+  {q:"Warum darf man den Kühlerdeckel nicht bei heißem Motor öffnen?",o:["Weil das System unter Druck steht und Kühlmittel herausspritzen kann","Weil der Motor dann ausgeht","Weil das Kühlmittel sonst gefriert"],a:0,e:"Der Überdruck hält das Kühlmittel flüssig. Öffnest du, fällt der Druck, und es kann schlagartig kochen."},
+  {q:"Wie wird ein luftgekühlter Boxer gekühlt?",o:["Mit einem Gebläse und Kühlrippen","Mit einem Kühler vorne","Gar nicht"],a:0,e:"Das Gebläse bläst Luft über die Rippen der Zylinder. Kein Kühlmittel, keine Wasserpumpe."}
+ ]},
+ l10:{title:"Schmierung & Öl",steps:[
+  {scene:"oil",h:"Warum Öl?",t:"<p>Im Motor reiben Metallteile mit hoher Geschwindigkeit aneinander. Ohne Öl würden sie sich in Sekunden festfressen.</p><p>Das Öl bildet einen hauchdünnen Film, auf dem die Teile gleiten. Es kühlt außerdem, hält den Motor sauber und dichtet die Kolben ab.</p>"},
+  {scene:"oil",h:"Der Ölkreislauf",t:"<p>Das Öl sammelt sich unten in der <strong>Ölwanne</strong>. Die <strong>Ölpumpe</strong> saugt es über ein Sieb an und drückt es durch den <strong>Ölfilter</strong>.</p><p>Von dort fließt es durch Kanäle zu den Lagern der Kurbelwelle und zur Nockenwelle. Danach tropft es zurück in die Wanne.</p>"},
+  {scene:"oil",h:"Der Öldruck",t:"<p>Die Pumpe baut <strong>Öldruck</strong> auf. Fällt er zu tief, leuchtet die rote Ölkanne im Tacho.</p><p><b>Dann sofort anhalten und den Motor ausmachen.</b> Ohne Öldruck kann der Motor in kurzer Zeit kaputtgehen. Probier im Hologramm <b>Wenig Öl</b> aus.</p>"},
+  {scene:"oil",h:"Was auf der Flasche steht",t:"<p>Eine Angabe wie <strong>10W-40</strong> beschreibt die Viskosität, also wie zäh das Öl ist. Die Zahl vor dem W (Winter) sagt, wie gut es kalt fließt. Die zweite Zahl gilt für den warmen Motor.</p><p>Welches Öl dein Motor braucht, steht im Handbuch. Öl altert mit der Zeit. Gewechselt wird nach Wartungsplan, bei alten Autos oft einmal im Jahr.</p>"},
+  {q:"Was tun, wenn die rote Öldruckleuchte während der Fahrt angeht?",o:["Weiterfahren bis zur nächsten Werkstatt","Sofort anhalten und den Motor aus","Mehr Gas geben"],a:1,e:"Ohne Öldruck fehlt der Schmierfilm. Weiterfahren kann den Motor in Minuten zerstören."},
+  {q:"Wo sammelt sich das Öl im Motor?",o:["In der Ölwanne","Im Kühler","Im Zylinderkopf"],a:0,e:"Die Ölwanne sitzt unten am Motor. Von dort saugt die Ölpumpe es wieder an."},
+  {q:"Was bedeutet das W in 10W-40?",o:["Wasser","Winter","Watt"],a:1,e:"Die Zahl vor dem W beschreibt, wie gut das Öl bei Kälte fließt."}
+ ]},
+ l11:{title:"Zündung & Elektrik",steps:[
+  {scene:"electric12",h:"Strom im Auto",t:"<p>Das Bordnetz arbeitet mit 12 Volt. Die <strong>Batterie</strong> speichert den Strom, den du zum Starten brauchst und wenn der Motor aus ist.</p>"},
+  {scene:"electric12",h:"Starten",t:"<p>Drehst du den Schlüssel, bekommt der <strong>Anlasser</strong> viel Strom aus der Batterie. Er ist ein kleiner, kräftiger Elektromotor. Mit einem Zahnrad greift er in den Zahnkranz am Schwungrad und dreht den Motor, bis er von selbst läuft.</p><p>Halte im Hologramm <b>Starten</b> gedrückt.</p>"},
+  {scene:"electric12",h:"Die Lichtmaschine",t:"<p>Läuft der Motor, treibt er über einen <strong>Keilriemen</strong> die <strong>Lichtmaschine</strong> an. Sie erzeugt Strom für alles im Auto und lädt die Batterie wieder auf, mit etwa 14 Volt.</p><p>Leuchtet während der Fahrt die Batterieleuchte, lädt die Lichtmaschine nicht. Oft ist dann der Keilriemen gerissen oder locker.</p>"},
+  {scene:"electric12",h:"Die Zündung beim Benziner",t:"<p>Für den Funken reichen 12 Volt nicht. Die <strong>Zündspule</strong> macht daraus viele tausend Volt.</p><p>Bei älteren Autos verteilt der <strong>Zündverteiler</strong> diesen Strom über Zündkabel an die richtige Zündkerze. Er hält dabei die <strong>Zündreihenfolge</strong> ein, beim Reihenvierzylinder meist 1-3-4-2, beim VW-Boxer 1-4-3-2.</p><p>Ein Diesel braucht keine Zündanlage. Er hat stattdessen Glühkerzen für den Kaltstart.</p>"},
+  {scene:"electric12",h:"Sicherungen",t:"<p>Jeder Stromkreis ist mit einer <strong>Sicherung</strong> geschützt. Gibt es einen Kurzschluss, brennt sie durch, bevor ein Kabel heiß wird.</p><p>Geht ein einzelnes Teil nicht, etwa das Radio oder ein Licht, ist oft die Sicherung schuld. Der Sicherungskasten und ein Plan dazu stehen im Handbuch.</p>"},
+  {q:"Welches Teil lädt die Batterie während der Fahrt?",o:["Der Anlasser","Die Lichtmaschine","Die Zündspule"],a:1,e:"Die Lichtmaschine wird vom Motor angetrieben und erzeugt Strom. Der Anlasser verbraucht nur Strom."},
+  {q:"Wozu dient die Zündspule?",o:["Sie macht aus 12 Volt viele tausend Volt für den Funken","Sie speichert Strom","Sie dreht den Motor beim Start"],a:0,e:"Nur mit sehr hoher Spannung springt der Funke an der Zündkerze über."},
+  {q:"Die Batterieleuchte geht während der Fahrt an. Was ist eine häufige Ursache?",o:["Leerer Tank","Gerissener oder lockerer Keilriemen","Zu viel Öl"],a:1,e:"Ohne Riemen dreht die Lichtmaschine nicht, und das Auto fährt nur noch mit dem Strom aus der Batterie."}
+ ]},
+ l12:{title:"Die Bremsen",steps:[
+  {scene:"brake",h:"Bewegung wird Wärme",t:"<p>Bremsen heißt: Die Bewegung des Autos wird durch Reibung in Wärme umgewandelt. Nach einer starken Bremsung können Bremsscheiben mehrere hundert Grad heiß werden.</p>"},
+  {scene:"brake",h:"Vom Pedal zum Rad",t:"<p>Das Pedal drückt auf den <strong>Hauptbremszylinder</strong>. Der presst <strong>Bremsflüssigkeit</strong> durch dünne Leitungen zu allen vier Rädern. Flüssigkeit lässt sich nicht zusammendrücken, deshalb kommt der Druck sofort an.</p><p>Am Rad drückt ein Kolben im <strong>Bremssattel</strong> die <strong>Bremsbeläge</strong> gegen die <strong>Bremsscheibe</strong>. Halte im Hologramm <b>Bremsen</b> gedrückt.</p>"},
+  {scene:"brake",h:"Hilfe beim Treten",t:"<p>Der <strong>Bremskraftverstärker</strong> zwischen Pedal und Hauptbremszylinder nutzt Unterdruck vom Motor. So brauchst du viel weniger Kraft am Pedal.</p><p>Bei ausgeschaltetem Motor ist das Pedal deshalb nach ein paarmal Treten auffällig hart.</p>"},
+  {scene:"brake",h:"Scheibe und Trommel",t:"<p>Vorne haben fast alle Autos Scheibenbremsen. Hinten sitzt bei älteren Autos oft eine <strong>Trommelbremse</strong>, so beim T3. Dort drücken Bremsbacken von innen gegen eine Trommel.</p>"},
+  {scene:"brake",h:"Wartung",t:"<p>Beläge und Scheiben nutzen sich ab und werden irgendwann getauscht. Schleifende oder quietschende Geräusche sind ein Warnzeichen.</p><p>Bremsflüssigkeit zieht mit der Zeit Wasser an. Dadurch kann sie bei Hitze Dampfblasen bilden, und das Pedal fällt durch. Deshalb wird sie meist alle zwei Jahre gewechselt.</p>"},
+  {q:"Was macht der Bremssattel?",o:["Er drückt die Beläge gegen die Scheibe","Er kühlt die Bremse","Er misst das Tempo"],a:0,e:"Im Sattel sitzt ein Kolben. Der Flüssigkeitsdruck schiebt ihn nach außen und presst die Beläge an die Scheibe."},
+  {q:"Warum wird Bremsflüssigkeit regelmäßig gewechselt?",o:["Weil sie verdunstet","Weil sie Wasser anzieht und dann bei Hitze Blasen bilden kann","Weil sie die Farbe ändert"],a:1,e:"Wasser in der Flüssigkeit senkt den Siedepunkt. Dampfblasen lassen sich zusammendrücken, und die Bremse wird weich."},
+  {q:"Wohin geht die Bewegungsenergie beim Bremsen?",o:["In die Batterie","In Wärme","In den Tank"],a:1,e:"Reibung macht aus Bewegung Wärme. Darum werden Bremsen heiß. Nur Elektro- und Hybridautos gewinnen einen Teil als Strom zurück."}
+ ]},
+ l13:{title:"Fahrwerk & Lenkung",steps:[
+  {scene:"suspension",h:"Feder und Dämpfer",t:"<p>Das <strong>Fahrwerk</strong> hält die Räder auf der Straße. Fährst du über eine Bodenwelle, fängt die <strong>Feder</strong> den Stoß ab.</p><p>Eine Feder allein würde aber lange nachschwingen. Der <strong>Stoßdämpfer</strong> bremst dieses Wippen.</p>"},
+  {scene:"suspension",h:"Probier es aus",t:"<p>Im Hologramm fährt das Rad über Bodenwellen. Schalte auf <b>Dämpfer kaputt</b> und schau, wie die Karosserie nachwippt.</p><p>Kaputte Dämpfer sind gefährlich. Das Rad verliert öfter den Kontakt zur Straße, der Bremsweg wird länger.</p>"},
+  {h:"Die Lenkung",t:"<p>Das Lenkrad dreht über eine Welle das <strong>Lenkgetriebe</strong>. Dort wird die Drehung in eine Seitwärtsbewegung umgewandelt, oft über eine <strong>Zahnstange</strong>.</p><p>Die <strong>Spurstangen</strong> übertragen sie auf die Räder. Viele neuere Autos haben eine Servolenkung, die beim Lenken hilft. Beim T3 war sie nur auf Wunsch dabei.</p>"},
+  {h:"Spur und Sturz",t:"<p>Die Räder stehen nicht ganz gerade. Die <strong>Spur</strong> sagt, wie sehr sie von oben gesehen nach innen oder außen zeigen. Der <strong>Sturz</strong> sagt, wie schräg sie von vorne gesehen stehen.</p><p>Stimmt das nicht, zieht das Auto zur Seite, und die Reifen nutzen sich einseitig ab. Eingestellt wird das bei einer <strong>Achsvermessung</strong>.</p>"},
+  {h:"Die Reifen",t:"<p>Die Reifen sind die einzige Verbindung zur Straße, jeder etwa so groß wie eine Postkarte.</p><p>In Deutschland ist eine <strong>Profiltiefe</strong> von mindestens 1,6 mm Pflicht. Empfohlen werden etwa 3 mm bei Sommer- und 4 mm bei Winterreifen. Auch alte Reifen mit viel Profil werden hart und rutschig.</p>"},
+  {q:"Was passiert mit kaputten Stoßdämpfern?",o:["Das Auto wippt lange nach und der Bremsweg wird länger","Das Auto fährt ruhiger","Nichts, die Feder reicht"],a:0,e:"Ohne Dämpfung schwingt die Feder nach. Das Rad hat weniger Bodenkontakt."},
+  {q:"Welches Teil verbindet das Lenkgetriebe mit den Rädern?",o:["Die Kardanwelle","Die Spurstange","Der Stoßdämpfer"],a:1,e:"Die Spurstangen schieben und ziehen an den Rädern und lenken sie so."},
+  {q:"Wie tief muss das Reifenprofil in Deutschland mindestens sein?",o:["0,5 mm","1,6 mm","5 mm"],a:1,e:"1,6 mm sind gesetzlich vorgeschrieben. Für gute Haftung bei Nässe sind mehr empfohlen."}
+ ]},
+ l5:{title:"Reihe, Boxer, V",steps:[
+  {scene:"engine",opts:{layout:"inline4"},h:"Reihenmotor",t:"<p>Mehrere Zylinder laufen ruhiger als einer. Wie sie angeordnet sind, gibt dem Motor den Namen.</p><p>Beim <strong>Reihenmotor</strong> stehen alle Zylinder in einer Reihe. So ist es im <strong>Audi 80</strong>.</p>"},
+  {scene:"engine",opts:{layout:"boxer4"},h:"Boxermotor",t:"<p>Beim <strong>Boxer</strong> liegen die Zylinder flach und gegenüber. Die Kolben bewegen sich gleichzeitig nach außen und innen, wie zwei Boxer.</p><p>Er baut sehr flach. Darum passt er im <strong>T3</strong> unter den Laderaumboden.</p>"},
+  {scene:"engine",opts:{layout:"v6"},h:"V-Motor",t:"<p>Beim <strong>V-Motor</strong> stehen zwei Zylinderreihen schräg zueinander, wie ein V. So passen viele Zylinder auf wenig Länge.</p>"},
+  {q:"Welche Bauart hat der Benzinmotor im VW T3?",o:["Reihenmotor","Boxermotor","V-Motor"],a:1,e:"Alle Benziner im T3 sind Boxer: erst luftgekühlt, ab 1983 als wassergekühlter „Wasserboxer“. Die Diesel im T3 sind dagegen Reihenmotoren."},
+  {q:"Was ist ein Vorteil des Boxers?",o:["Er baut flach und hat einen tiefen Schwerpunkt","Er braucht keine Kurbelwelle","Er läuft nur mit Diesel"],a:0,e:"Flach und tief: gut für den Schwerpunkt und für enge Einbauräume wie im T3 oder Käfer."}
+ ]}
+};
+const ORDER=UNITS.flatMap(u=>u.lessons).filter(id=>LESSONS[id]);
+
+/* ============ CONTENT: MOTORS ============ */
+const MOTORS={
+ benziner:{name:"Benziner",group:"fuel",scene:"fourstroke",opts:{fuel:"benzin"},lede:"Ottomotor mit Fremdzündung durch die Zündkerze.",how:"Ansaugen, verdichten, mit Funken zünden, ausstoßen. Ein Gemisch aus Luft und Benzin wird zusammengedrückt und von der Zündkerze entzündet.",pro:["Dreht hoch und läuft ruhig","Leichter und günstiger gebaut","Einfacher Kaltstart"],con:["Höherer Verbrauch als Diesel","Weniger Kraft bei niedriger Drehzahl"],spec:[["Zündung","Zündkerze (Fremdzündung)"],["Verdichtung","ca. 8:1 bis 11:1 (ältere Motoren)"],["Kraftstoff","Benzin"]],cars:["vw-t3","audi-80","vw-golf-2","porsche-911"],lesson:"l3"},
+ diesel:{name:"Diesel",group:"fuel",scene:"fourstroke",opts:{fuel:"diesel"},lede:"Selbstzünder: Die Verdichtungshitze zündet den Kraftstoff.",how:"Nur Luft wird angesaugt und sehr stark verdichtet. In die heiße Luft wird Diesel eingespritzt und entzündet sich von selbst.",pro:["Sparsam","Viel Kraft bei niedriger Drehzahl","Langlebig"],con:["Schwerer und lauter","Braucht Vorglühen bei Kälte","Ruß und Stickoxide im Abgas"],spec:[["Zündung","Selbstzündung, Glühkerze für Kaltstart"],["Verdichtung","ca. 16:1 bis 23:1"],["Kraftstoff","Diesel"]],cars:["vw-t3","mb-w123","audi-80","vw-golf-2"],lesson:"l4"},
+ elektro:{name:"Elektro",group:"fuel",scene:"electric",lede:"Strom statt Verbrennung: Magnetfelder drehen den Rotor.",how:"Der Akku liefert Strom an die Spulen im Stator. Die Spulen werden nacheinander bestromt, das wandernde Magnetfeld zieht den Rotor mit.",pro:["Volle Kraft ab Stillstand","Kaum Wartung, keine Kupplung","Leise, lokal keine Abgase"],con:["Schwerer Akku","Laden dauert länger als Tanken"],spec:[["Antrieb","Elektromotor (Stator + Rotor)"],["Energie","Akku"],["Getriebe","meist nur eine Übersetzung"]],cars:[],lesson:null},
+ reihe:{name:"Reihenmotor",group:"layout",scene:"engine",opts:{layout:"inline4"},lede:"Alle Zylinder stehen hintereinander in einer Reihe.",how:"Die einfachste Bauart: ein Zylinderkopf, eine Reihe Zylinder, eine Kurbelwelle darunter. Üblich sind 3, 4, 5 oder 6 Zylinder.",pro:["Einfach und günstig","Leicht zu warten","Sechszylinder läuft besonders ruhig"],con:["Wird bei vielen Zylindern lang"],spec:[["Zylinder","meist 3 bis 6"],["Beispiel","Audi 80, Golf II, T3-Diesel"]],cars:["audi-80","vw-golf-2","mb-w123","vw-t3"],lesson:"l5"},
+ boxer:{name:"Boxermotor",group:"layout",scene:"engine",opts:{layout:"boxer4"},lede:"Zylinder liegen flach und gegenüber, die Kolben boxen gegeneinander.",how:"Gegenüberliegende Kolben bewegen sich gleichzeitig nach außen und innen. Dadurch gleichen sich viele Kräfte aus, und der Motor baut sehr flach.",pro:["Flach, tiefer Schwerpunkt","Läuft ausgeglichen","Passt unter Laderaumböden"],con:["Breit","Zwei Zylinderköpfe, mehr Teile"],spec:[["Zylinder","meist 4 oder 6"],["Beispiel","VW T3, Käfer, Porsche 911"]],cars:["vw-t3","vw-kaefer","porsche-911"],lesson:"l5"},
+ v:{name:"V-Motor",group:"layout",scene:"engine",opts:{layout:"v6"},lede:"Zwei Zylinderreihen im V-Winkel auf einer Kurbelwelle.",how:"Je zwei Zylinder teilen sich einen Abschnitt der Kurbelwelle. So passen 6, 8 oder mehr Zylinder in einen kurzen Motor.",pro:["Kurz und kompakt bei vielen Zylindern","Viel Leistung möglich"],con:["Aufwendiger und teurer","Zwei Zylinderköpfe"],spec:[["Zylinder","meist 6, 8 oder mehr"],["Beispiel","Audi 80 B4 2.6/2.8 V6"]],cars:["audi-80"],lesson:"l5"}
+};
+
+/* ============ CONTENT: CARS ============ */
+const OIL={t:"Ölstand prüfen",steps:["Auto auf ebenen Boden stellen, Motor aus und ein paar Minuten warten, damit das Öl zurückläuft.","Ölmessstab herausziehen und mit einem Tuch abwischen.","Messstab wieder ganz hineinstecken und erneut herausziehen.","Der Ölfilm muss zwischen der Min- und der Max-Markierung liegen.","Fehlt Öl, in kleinen Mengen nachfüllen und erneut messen. Welches Öl passt, steht im Handbuch."]};
+const TIRE={t:"Reifendruck prüfen",steps:["Bei kalten Reifen messen, also vor der Fahrt oder nach längerer Pause.","Den richtigen Druck findest du im Handbuch oder auf einem Aufkleber am Fahrzeug, oft unterschieden nach Beladung.","Ventilkappe ab, Prüfer aufsetzen und ablesen.","Auf den Sollwert auffüllen und die Kappe wieder aufschrauben."]};
+const CARS={
+ "vw-t3":{name:"VW T3",nick:"Bulli",years:"1979–1992",body:"Transporter / Bus",
+  layout:{engine:"rear",drive:"rear",orient:"long"},
+  intro:"Der letzte VW-Bus mit Heckmotor. Motor und Antrieb sitzen hinten, wie beim Käfer.",
+  variants:[
+   {n:"Luftgekühlter Boxer",y:"1979–1983",eng:"boxer4",motor:"boxer",fuel:"Benzin",cool:"Luft, mit Gebläse am Motor",size:"1,6 l oder 2,0 l",power:"50 bis 70 PS"},
+   {n:"Wasserboxer",y:"1983–1992",eng:"boxer4",motor:"boxer",fuel:"Benzin",cool:"Wasser, Kühler vorne",size:"1,9 l oder 2,1 l",power:"60 bis 112 PS"},
+   {n:"Diesel / Turbodiesel",y:"1981–1992",eng:"inline4",motor:"reihe",fuel:"Diesel",cool:"Wasser, Kühler vorne",size:"1,6 l oder 1,7 l",power:"50 bis 70 PS"}
+  ],
+  gearbox:"Schaltgetriebe mit 4 oder 5 Gängen, auf Wunsch Automatik",
+  driveText:"Hinterradantrieb. Als Syncro (ab 1985) mit Allrad.",
+  where:[["Motor","Hinten, flach unter dem Boden des Laderaums."],["Getriebe & Differential","Vor dem Motor, zwischen den Hinterrädern. Das Differential steckt im Getriebegehäuse."],["Kühler","Bei Wasserboxer und Diesel vorne hinter dem Grill. Lange Kühlmittelleitungen laufen unter dem Wagen nach hinten."],["Ölmessstab","Je nach Motor über die Klappe hinter dem hinteren Kennzeichen oder über die Motorklappe im Laderaum."]],
+  weak:[["Rost","Radläufe, Schweller, Fensterrahmen und Bodenblech genau ansehen."],["Wasserboxer: Zylinderkopfdichtungen","Neigen zu Undichtigkeiten, vor allem mit altem Kühlmittel."],["Kühlsystem entlüften","Durch die langen Leitungen nach vorne bleibt leicht Luft im System. Das sorgfältig machen."],["Luftboxer: Ventilspiel und Öl","Ventilspiel regelmäßig einstellen. Ölverlust ist häufig."]],
+  guides:[OIL,TIRE],lessons:["l6","l7","l9","l10","l12","l5"],compare:true},
+ "audi-80":{name:"Audi 80",nick:"",years:"1978–1995",body:"Limousine (später auch Avant und Cabrio)",
+  layout:{engine:"front",drive:"front",orient:"long"},
+  intro:"Mittelklasse mit Frontantrieb. Der Motor sitzt längs eingebaut vorne, vor der Vorderachse.",
+  variants:[
+   {n:"B2",y:"1978–1986",eng:"inline4",motor:"reihe",fuel:"Benzin oder Diesel",cool:"Wasser",size:"etwa 1,3 bis 1,9 l",power:"steht im Fahrzeugschein unter P.2 (kW)"},
+   {n:"B3",y:"1986–1991",eng:"inline4",motor:"reihe",fuel:"Benzin oder Diesel",cool:"Wasser",size:"etwa 1,6 bis 2,0 l",power:"steht im Fahrzeugschein unter P.2 (kW)"},
+   {n:"B4 Vierzylinder",y:"1991–1995",eng:"inline4",motor:"reihe",fuel:"Benzin oder Diesel (auch TDI)",cool:"Wasser",size:"etwa 1,6 bis 2,0 l, TDI 1,9 l",power:"steht im Fahrzeugschein unter P.2 (kW)"},
+   {n:"B4 V6",y:"1991–1995",eng:"v6",motor:"v",fuel:"Benzin",cool:"Wasser",size:"2,6 l oder 2,8 l",power:"steht im Fahrzeugschein unter P.2 (kW)"}
+  ],
+  gearbox:"Schaltgetriebe mit 4 oder 5 Gängen, auf Wunsch Automatik",
+  driveText:"Frontantrieb. Als quattro mit Allrad.",
+  where:[["Motor","Vorne, längs eingebaut, ein Stück vor der Vorderachse."],["Getriebe & Differential","Direkt hinter dem Motor, zwischen den Vorderrädern. Das Differential sitzt im Getriebe."],["Kühler","Vorne hinter dem Grill."],["Ölmessstab","Im Motorraum unter der Motorhaube, am Motorblock."]],
+  weak:[["Zahnriemen","Wechselintervall unbedingt einhalten. Reißt er, können Motorschäden entstehen."],["Rost (vor allem B2)","Ab dem B3 ist die Karosserie vollverzinkt und deutlich rostfester."],["Gummilager & Fahrwerk","Altern mit den Jahren. Klappern und schwammiges Fahrgefühl sind typische Zeichen."],["Kühlsystem","Schläuche und Thermostat altersbedingt prüfen."]],
+  guides:[OIL,TIRE],lessons:["l7","l8","l9","l11","l12","l5"]},
+ "vw-kaefer":{name:"VW Käfer",years:"1945–2003",body:"Kleinwagen",layout:{engine:"rear",drive:"rear",orient:"long"},intro:"Der Klassiker mit luftgekühltem Boxer im Heck.",
+  variants:[{n:"Typ 1",y:"1945–2003",eng:"boxer4",motor:"boxer",fuel:"Benzin",cool:"Luft, mit Gebläse",size:"etwa 1,1 bis 1,6 l",power:"etwa 25 bis 50 PS"}],gearbox:"4-Gang-Schaltgetriebe",driveText:"Hinterradantrieb.",lessons:["l5"]},
+ "vw-golf-2":{name:"VW Golf II",years:"1983–1992",body:"Kompaktklasse",layout:{engine:"front",drive:"front",orient:"trans"},intro:"Frontantrieb mit quer eingebautem Reihenmotor.",
+  variants:[{n:"Benziner / Diesel",y:"1983–1992",eng:"inline4",motor:"reihe",fuel:"Benzin oder Diesel",cool:"Wasser",size:"etwa 1,3 bis 1,8 l",power:"steht im Fahrzeugschein unter P.2 (kW)"}],gearbox:"4- oder 5-Gang-Schaltgetriebe, auf Wunsch Automatik",driveText:"Frontantrieb. Als syncro mit Allrad.",lessons:["l1","l5"]},
+ "mb-w123":{name:"Mercedes W123",years:"1976–1986",body:"Limousine / T-Modell",layout:{engine:"front",drive:"rear",orient:"long"},intro:"Klassischer Aufbau: Motor vorne längs, Antrieb hinten über eine Kardanwelle.",
+  variants:[{n:"Diesel (z. B. 240 D)",y:"1976–1986",eng:"inline4",motor:"reihe",fuel:"Diesel",cool:"Wasser",size:"2,0 bis 3,0 l (4 oder 5 Zylinder)",power:"steht im Fahrzeugschein unter P.2 (kW)"},{n:"Benziner",y:"1976–1986",eng:"inline6",motor:"reihe",fuel:"Benzin",cool:"Wasser",size:"2,0 bis 2,8 l (4 oder 6 Zylinder)",power:"steht im Fahrzeugschein unter P.2 (kW)"}],gearbox:"4- oder 5-Gang-Schaltgetriebe oder Automatik",driveText:"Hinterradantrieb über Kardanwelle.",lessons:["l1","l4"]},
+ "porsche-911":{name:"Porsche 911 (G-Modell)",years:"1973–1989",body:"Sportwagen",layout:{engine:"rear",drive:"rear",orient:"long"},intro:"Luftgekühlter Sechszylinder-Boxer hinter der Hinterachse.",
+  variants:[{n:"Carrera / SC",y:"1973–1989",eng:"boxer6",motor:"boxer",fuel:"Benzin",cool:"Luft, mit Gebläse",size:"2,7 bis 3,2 l",power:"steht im Fahrzeugschein unter P.2 (kW)"}],gearbox:"4- oder 5-Gang-Schaltgetriebe",driveText:"Hinterradantrieb.",lessons:["l5"]}
+};
+
+/* ============ 3D: HOLOGRAM ENGINE ============ */
+const HOLO=0x5fe3ff, AMBER=0xffb648, OKC=0x57e39a;
+const REDUCED=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const Y=new THREE.Vector3(0,1,0);
+function holo(geo,color=HOLO,op=.16,label,edgeOp=.85){
+  const g=new THREE.Group();
+  const mm=new THREE.MeshBasicMaterial({color,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  const lm=new THREE.LineBasicMaterial({color,transparent:true,opacity:edgeOp,blending:THREE.AdditiveBlending,depthWrite:false});
+  const m=new THREE.Mesh(geo,mm), e=new THREE.LineSegments(new THREE.EdgesGeometry(geo,24),lm);
+  g.add(m,e); g.userData.mats=[mm,lm]; if(label){g.userData.label=label;m.userData.label=label}
+  return g;
+}
+function tint(g,c){g.userData.mats.forEach(m=>m.color.set(c))}
+function fade(g,o){g.userData.mats[0].opacity=o*.2;g.userData.mats[1].opacity=o}
+
+const ENGINES={
+ single:[{x:0,dir:[1,0],ph:0}],
+ inline4:[{x:-.6,dir:[1,0],ph:0},{x:-.2,dir:[1,0],ph:180},{x:.2,dir:[1,0],ph:180},{x:.6,dir:[1,0],ph:0}],
+ inline6:[0,120,240,240,120,0].map((p,i)=>({x:-.75+i*.3,dir:[1,0],ph:p})),
+ boxer4:[{x:-.66,dir:[0,1],ph:0},{x:-.22,dir:[0,-1],ph:180},{x:.22,dir:[0,1],ph:180},{x:.66,dir:[0,-1],ph:0}],
+ boxer6:[[0,1,0],[180,-1,0],[120,1,1],[300,-1,1],[240,1,2],[60,-1,2]].map(([p,s,k],i)=>({x:-.8+i*.32,dir:[0,s],ph:p})),
+ v6:[0,120,240].flatMap((p,k)=>[{x:-.5+k*.5-.1,dir:[.7071,.7071],ph:p},{x:-.5+k*.5+.1,dir:[.7071,-.7071],ph:p}])
+};
+const ENGNAME={inline4:"Reihen-Vierzylinder",inline6:"Reihen-Sechszylinder",boxer4:"Boxer-Vierzylinder",boxer6:"Boxer-Sechszylinder",v6:"V6",single:"Einzylinder"};
+
+function buildEngine(cyls,o={}){
+  const r=o.r||.3,L=o.L||.9,bore=o.bore||.21,h=o.h||.26;
+  const grp=new THREE.Group(),crank=new THREE.Group();grp.add(crank);
+  const xs=cyls.map(c=>c.x),x0=Math.min(...xs)-.22,x1=Math.max(...xs)+.22;
+  const shaft=holo(new THREE.CylinderGeometry(.06,.06,x1-x0+.35,12),AMBER,.3,"Kurbelwelle");
+  shaft.rotation.z=Math.PI/2;shaft.position.x=(x0+x1)/2;crank.add(shaft);
+  const sMax=L+r,top=sMax+h-.04;
+  const parts=cyls.map(c=>{
+    const d=new THREE.Vector3(0,c.dir[0],c.dir[1]).normalize(),q=new THREE.Quaternion().setFromUnitVectors(Y,d),ph=c.ph*Math.PI/180;
+    const web=holo(new THREE.BoxGeometry(.05,r+.14,.15),AMBER,.22,"Kurbelwelle");
+    web.rotation.x=ph;web.position.set(c.x,r/2*Math.cos(ph),r/2*Math.sin(ph));crank.add(web);
+    const pin=holo(new THREE.CylinderGeometry(.05,.05,.12,10),AMBER,.3,"Kurbelwelle");
+    pin.rotation.z=Math.PI/2;pin.position.set(c.x,r*Math.cos(ph),r*Math.sin(ph));crank.add(pin);
+    const lo=L-r-.05,len=top+.02-lo;
+    const sleeve=holo(new THREE.CylinderGeometry(bore+.03,bore+.03,len,22,1,true),HOLO,.05,"Zylinder",.35);
+    sleeve.quaternion.copy(q);sleeve.position.copy(d.clone().multiplyScalar(lo+len/2)).add(new THREE.Vector3(c.x,0,0));grp.add(sleeve);
+    const piston=holo(new THREE.CylinderGeometry(bore,bore,h,22),HOLO,.28,"Kolben");piston.quaternion.copy(q);grp.add(piston);
+    const rod=holo(new THREE.BoxGeometry(.07,1,.045),0xb9f3ff,.25,"Pleuelstange");grp.add(rod);
+    return {c,d,ph,piston,rod,s:0};
+  });
+  const pinW=new THREE.Vector3(),pp=new THREE.Vector3();
+  function update(th){
+    crank.rotation.x=th;
+    for(const p of parts){
+      const a=th+p.ph;pinW.set(p.c.x,r*Math.cos(a),r*Math.sin(a));
+      const cd=pinW.y*p.d.y+pinW.z*p.d.z,s=cd+Math.sqrt(L*L-r*r+cd*cd);p.s=s;
+      pp.set(p.c.x,0,0).addScaledVector(p.d,s);
+      p.piston.position.copy(pp).addScaledVector(p.d,h/2-.04);
+      const dir=pp.clone().sub(pinW),l=dir.length();dir.normalize();
+      p.rod.quaternion.setFromUnitVectors(Y,dir);p.rod.position.copy(pinW).addScaledVector(dir,l/2);p.rod.scale.y=l;
+    }
+  }
+  update(0);
+  return {grp,update,parts,top,L,r,h,bore};
+}
+
+function makeStage(el,{dist=6,rotY=-.55,rotX=.28,lookY=0}={}){
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setClearColor(0,0);
+  el.prepend(renderer.domElement);
+  const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(38,1,.1,100);
+  const root=new THREE.Group();scene.add(root);
+  // projector base
+  const base=new THREE.Group();base.position.y=-1.55;scene.add(base);
+  [[1.9,1.93,.7],[1.45,1.46,.35],[.9,.905,.25]].forEach(([a,b,o])=>{const m=new THREE.Mesh(new THREE.RingGeometry(a,b,96),new THREE.MeshBasicMaterial({color:HOLO,transparent:true,opacity:o,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false}));m.rotation.x=-Math.PI/2;base.add(m)});
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(1.9,1.9,.9,64,1,true),new THREE.MeshBasicMaterial({color:HOLO,transparent:true,opacity:.035,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false}));beam.position.y=.45;base.add(beam);
+  const st={rotY,rotX,dist,lastTouch:-1e9,ups:[],raf:0,disposed:false,onPick:null,lookY};
+  function resize(){const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+  const ro=new ResizeObserver(resize);ro.observe(el);resize();
+  // interaction
+  const ptrs=new Map();let pinch0=0,dist0=0,moved=0,downAt=0;
+  const cv=renderer.domElement;
+  cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;downAt=performance.now();if(ptrs.size===2){const[a,b]=[...ptrs.values()];pinch0=Math.hypot(a.x-b.x,a.y-b.y);dist0=st.dist}});
+  cv.addEventListener("pointermove",e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;moved+=Math.abs(dx)+Math.abs(dy);st.lastTouch=performance.now();
+    if(ptrs.size===1){st.rotY+=dx*.011;st.rotX=Math.max(-.6,Math.min(1.2,st.rotX+dy*.008))}
+    p.x=e.clientX;p.y=e.clientY;
+    if(ptrs.size===2){const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch0)st.dist=Math.max(dist*.5,Math.min(dist*1.7,dist0*pinch0/d))}});
+  const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pinch0=0;if(moved<8&&performance.now()-downAt<400)pick(e)};
+  cv.addEventListener("pointerup",up);cv.addEventListener("pointercancel",e=>ptrs.delete(e.pointerId));
+  cv.addEventListener("wheel",e=>{e.preventDefault();st.dist=Math.max(dist*.5,Math.min(dist*1.7,st.dist*(1+e.deltaY*.001)))},{passive:false});
+  const ray=new THREE.Raycaster(),v2=new THREE.Vector2();
+  function pick(e){const r=cv.getBoundingClientRect();v2.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(v2,cam);
+    const hits=ray.intersectObjects(root.children,true).filter(h=>h.object.isMesh&&h.object.userData.label);
+    if(hits.length&&st.onPick)st.onPick(hits[0].object.userData.label)}
+  let last=performance.now();
+  function loop(t){if(st.disposed)return;st.raf=requestAnimationFrame(loop);const dt=Math.max(0,Math.min(.05,(t-last)/1000));last=t;
+    if(!REDUCED&&t-st.lastTouch>3500)st.rotY+=dt*.12;
+    root.rotation.set(st.rotX,st.rotY,0);cam.position.set(0,st.lookY+.15,st.dist);cam.lookAt(0,st.lookY,0);
+    st.ups.forEach(f=>f(dt,t/1000));renderer.render(scene,cam)}
+  st.raf=requestAnimationFrame(loop);
+  return {scene,root,cam,st,add:f=>st.ups.push(f),
+    dispose(){st.disposed=true;cancelAnimationFrame(st.raf);ro.disconnect();scene.traverse(o=>{o.geometry&&o.geometry.dispose();if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose())});renderer.dispose();try{renderer.forceContextLoss()}catch(e){}cv.remove()}};
+}
+
+/* Scenes: each builds into stage.root, may write HUD via api */
+
+function flow(parent,pts,n,color,size=.04,label,tube=.03){
+  const P=pts.map(p=>new THREE.Vector3(...p)),L=[];let tot=0;for(let i=1;i<P.length;i++){const l=P[i].distanceTo(P[i-1]);L.push(l);tot+=l}
+  const fr=[0];{let c=0;L.forEach(l=>{c+=l;fr.push(c/tot)})}
+  const cp=new THREE.CurvePath();for(let i=1;i<P.length;i++)cp.add(new THREE.LineCurve3(P[i-1],P[i]));
+  const tm=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.13,blending:THREE.AdditiveBlending,depthWrite:false});
+  const tb=new THREE.Mesh(new THREE.TubeGeometry(cp,Math.max(8,(P.length-1)*6),tube,6,false),tm);if(label)tb.userData.label=label;parent.add(tb);
+  const geo=new THREE.SphereGeometry(size,8,6),ms=[];
+  for(let i=0;i<n;i++){const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false}));parent.add(m);ms.push(m)}
+  let u=0;const at=(f,o)=>{let d=f*tot,i=0;while(i<L.length-1&&d>L[i]){d-=L[i];i++}return o.copy(P[i]).lerp(P[i+1],Math.min(1,d/L[i]))};
+  return {fr,tube:tb,step(dv,op=1,colFn){u=((u+dv/tot)%1+1)%1;ms.forEach((m,i)=>{const f=(u+i/n)%1;at(f,m.position);m.material.opacity=op*.9;m.visible=op>.02;if(colFn)m.material.color.copy(colFn(f))});tm.opacity=.06+.1*op}};
+}
+const SCENES={
+ piston(S_,api){
+  const e=buildEngine(ENGINES.single,{r:.38,L:1.05,bore:.3,h:.32});e.grp.position.y=-.9;S_.root.add(e.grp);
+  const head=holo(new THREE.CylinderGeometry(.36,.36,.12,24),HOLO,.12,"Zylinderkopf");head.position.y=e.top+.08;e.grp.add(head);
+  let th=0;S_.add(dt=>{th+=dt*api.speed()*2.2;e.update(th);const deg=((th*180/Math.PI)%360+360)%360;
+    const tdc=deg<20||deg>340,bdc=Math.abs(deg-180)<20;api.hud(tdc?"OT":bdc?"UT":deg<180?"Kolben ↓":"Kolben ↑",`Kurbelwinkel ${String(Math.round(deg)).padStart(3,"0")}°`)});
+  return {dist:5.2};
+ },
+ fourstroke(S_,api,opts={}){
+  const diesel=opts.fuel==="diesel";
+  const e=buildEngine(ENGINES.single,{r:.38,L:1.05,bore:.3,h:.32});e.grp.position.y=-1;S_.root.add(e.grp);
+  const H=e.top+.03;
+  const head=holo(new THREE.BoxGeometry(.9,.2,.62),HOLO,.08,"Zylinderkopf",.5);head.position.y=H+.12;e.grp.add(head);
+  function valve(x,label,c){const g=new THREE.Group();const disc=holo(new THREE.CylinderGeometry(.1,.07,.03,16),c,.4,label);const stem=holo(new THREE.CylinderGeometry(.018,.018,.42,6),c,.4,label);stem.position.y=.22;g.add(disc,stem);g.position.set(x,H,0);g.userData.label=label;e.grp.add(g);
+    const port=holo(new THREE.CylinderGeometry(.075,.075,.55,12,1,true),c,.08,label==="Einlassventil"?"Ansaugkanal":"Auslasskanal",.45);port.rotation.z=x<0?-1.0:1.0;port.position.set(x*2.6,H+.3,0);e.grp.add(port);return g}
+  const vin=valve(-.14,"Einlassventil",HOLO),vout=valve(.14,"Auslassventil",AMBER);
+  const plug=holo(new THREE.CylinderGeometry(.03,.03,.36,8),diesel?OKC:0xffffff,.4,diesel?"Einspritzdüse":"Zündkerze");plug.position.set(0,H+.2,.12);e.grp.add(plug);
+  let glow=null;if(diesel){glow=holo(new THREE.CylinderGeometry(.025,.025,.12,6),0xff6040,.5,"Glühkerze");glow.rotation.x=.6;glow.position.set(0,H+.05,-.17);e.grp.add(glow)}
+  const gasM=new THREE.MeshBasicMaterial({color:HOLO,transparent:true,opacity:.3,blending:THREE.AdditiveBlending,depthWrite:false});
+  const gas=new THREE.Mesh(new THREE.CylinderGeometry(e.bore-.01,e.bore-.01,1,24),gasM);gas.userData.label=diesel?"Brennraum (Luft)":"Brennraum (Gemisch)";e.grp.add(gas);
+  const flash=new THREE.Mesh(new THREE.SphereGeometry(.2,16,12),new THREE.MeshBasicMaterial({color:diesel?0xffd27a:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));flash.position.set(0,H-.08,0);e.grp.add(flash);
+  const NAMES=["1 · Ansaugen","2 · Verdichten","3 · Arbeiten","4 · Ausstoßen"];
+  const c=new THREE.Color(),cIn=new THREE.Color(diesel?0x9fdcff:HOLO),cHot=new THREE.Color(0xffe08a),cFire=new THREE.Color(0xff6a2a),cEx=new THREE.Color(0x7d8a99);
+  let th=0;
+  S_.add(dt=>{th+=dt*api.speed()*1.6;const a=((th*180/Math.PI)%720+720)%720;e.update(th);
+    const k=Math.floor(a/180),f=(a%180)/180;
+    vin.position.y=H-(k===0?Math.sin(f*Math.PI)*.13:0);
+    vout.position.y=H-(k===3?Math.sin(f*Math.PI)*.13:0);
+    const pTop=e.parts[0].s+e.h-.04;gas.scale.y=Math.max(.01,H-pTop);gas.position.y=(H+pTop)/2;
+    if(k===0){c.copy(cIn);gasM.opacity=.12+.2*f}else if(k===1){c.copy(cIn).lerp(cHot,diesel?f:f*.6);gasM.opacity=.32+.25*f}else if(k===2){c.copy(cFire).lerp(cEx,f);gasM.opacity=.6-.35*f}else{c.copy(cEx);gasM.opacity=.25*(1-f)}
+    gasM.color.copy(c);
+    const near=(a>=350&&a<=372);flash.material.opacity=near?(1-Math.abs(a-361)/11)*.9:0;
+    if(diesel){tint(plug,a>=352&&a<=372?0xffe08a:OKC)}else{tint(plug,near?0xffffff:0x9fb6c6)}
+    const sub=diesel?["Luft strömt ein","Luft wird heiß","Einspritzen & Selbstzündung","Abgas raus"][k]:["Gemisch strömt ein","Gemisch wird zusammengedrückt","Zündfunke & Verbrennung","Abgas raus"][k];
+    api.hud(NAMES[k],`${sub} · ${String(Math.round(a)).padStart(3,"0")}° KW`)});
+  return {dist:5.6};
+ },
+ engine(S_,api,opts={}){
+  const lay=opts.layout||"inline4";const e=buildEngine(ENGINES[lay]);
+  const flat=lay.startsWith("boxer");e.grp.position.y=flat?-.2:-.85;S_.root.add(e.grp);
+  let th=0;S_.add(dt=>{th+=dt*api.speed()*2.4;e.update(th);api.hud(ENGNAME[lay],`${ENGINES[lay].length} Zylinder · in Zeitlupe`)});
+  return {dist:lay==="inline6"||lay==="boxer6"?6.6:5.8};
+ },
+ electric(S_,api){
+  const g=new THREE.Group();S_.root.add(g);
+  const coils=[];for(let i=0;i<6;i++){const a=i/6*Math.PI*2;const c=holo(new THREE.BoxGeometry(.32,.9,.28),HOLO,.12,"Stator-Spule");c.position.set(Math.cos(a)*1.05,0,Math.sin(a)*1.05);c.rotation.y=-a;g.add(c);coils.push(c)}
+  const ring=holo(new THREE.CylinderGeometry(1.3,1.3,.95,48,1,true),HOLO,.03,"Stator (Gehäuse)",.3);g.add(ring);
+  const rotor=new THREE.Group();g.add(rotor);
+  const core=holo(new THREE.CylinderGeometry(.62,.62,.85,32),0xb9f3ff,.1,"Rotor");rotor.add(core);
+  for(let i=0;i<4;i++){const a=i/4*Math.PI*2;const m=holo(new THREE.BoxGeometry(.22,.8,.12),i%2?AMBER:0xff6b6b,.35,i%2?"Magnet (Südpol)":"Magnet (Nordpol)");m.position.set(Math.cos(a)*.6,0,Math.sin(a)*.6);m.rotation.y=-a+Math.PI/2;rotor.add(m)}
+  const shaft=holo(new THREE.CylinderGeometry(.07,.07,2.3,12),AMBER,.3,"Welle");g.add(shaft);
+  g.position.y=-.1;
+  let th=0;S_.add(dt=>{th+=dt*api.speed()*1.8;rotor.rotation.y=-th;const k=Math.floor(((th/(Math.PI*2))*6)%6+6)%6;coils.forEach((c,i)=>{const on=i===k||i===(k+3)%6;tint(c,on?0xfff3b0:HOLO);c.userData.mats[0].opacity=on?.4:.12});api.hud("Elektromotor","Spulen schalten nacheinander · Rotor folgt")});
+  return {dist:5.4,rotX:1.0};
+ },
+ drivetrain(S_,api){
+  const g=new THREE.Group();S_.root.add(g);g.position.y=-.55;
+  const W=.95;
+  const eng=holo(new THREE.BoxGeometry(.75,.6,.7),HOLO,.14,"Motor");eng.position.set(0,.25,1.45);g.add(eng);
+  const fw=holo(new THREE.CylinderGeometry(.06,.06,.5,10),AMBER,.3,"Kurbelwelle");fw.rotation.x=Math.PI/2;fw.position.set(0,.18,1.3);g.add(fw);
+  const clutch=holo(new THREE.CylinderGeometry(.3,.3,.05,28),AMBER,.25,"Kupplung");clutch.rotation.x=Math.PI/2;clutch.position.set(0,.18,1.02);g.add(clutch);
+  const gb=holo(new THREE.BoxGeometry(.38,.36,.55),HOLO,.14,"Getriebe");gb.position.set(0,.16,.65);g.add(gb);
+  const shaft=holo(new THREE.CylinderGeometry(.045,.045,1.55,10),AMBER,.3,"Antriebswelle (Kardanwelle)");shaft.rotation.x=Math.PI/2;shaft.position.set(0,.12,-.33);g.add(shaft);
+  const diff=holo(new THREE.SphereGeometry(.22,16,12),AMBER,.22,"Differential");diff.position.set(0,.1,-1.25);g.add(diff);
+  const axle=holo(new THREE.CylinderGeometry(.04,.04,2*W-.2,10),AMBER,.3,"Achswelle");axle.rotation.z=Math.PI/2;axle.position.set(0,.1,-1.25);g.add(axle);
+  const fax=holo(new THREE.CylinderGeometry(.03,.03,2*W-.2,8),HOLO,.1,"Vorderachse",.35);fax.rotation.z=Math.PI/2;fax.position.set(0,.1,1.25);g.add(fax);
+  const wheels=[];[[W,1.25,0],[-W,1.25,0],[W,-1.25,1],[-W,-1.25,1]].forEach(([x,z,drv])=>{const w=holo(new THREE.TorusGeometry(.3,.09,10,28),drv?OKC:HOLO,drv?.25:.1,drv?"Angetriebenes Rad":"Rad (nicht angetrieben)",drv?.9:.45);w.rotation.y=Math.PI/2;w.position.set(x,.1,z);g.add(w);wheels.push(w)});
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(.09,12,10),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));g.add(dot);
+  const path=[[0,.25,1.45],[0,.18,1.02],[0,.16,.65],[0,.12,.45],[0,.12,-1.1],[0,.1,-1.25],[W,.1,-1.25]].map(p=>new THREE.Vector3(...p));
+  const seg=[];let tot=0;for(let i=1;i<path.length;i++){const l=path[i].distanceTo(path[i-1]);seg.push(l);tot+=l}
+  const steps=["Motor","Kupplung","Getriebe","Getriebe","Antriebswelle","Differential","Räder"];
+  let th=0,u=0;
+  S_.add(dt=>{const sp=api.speed();th+=dt*sp*3;fw.rotation.y=th*2;
+    clutch.rotation.y=th*2;shaft.rotation.y=th*1.4;wheels.forEach(w=>w.rotation.x=-th*.6);
+    u=(u+dt*sp*.32)%1;let d=u*tot,i=0;while(i<seg.length-1&&d>seg[i]){d-=seg[i];i++}
+    dot.position.copy(path[i]).lerp(path[i+1],Math.min(1,d/seg[i]));api.hud("Antriebsstrang","Kraft gerade bei: "+steps[i+1])});
+  return {dist:6.2,rotY:-.9,rotX:.5};
+ },
+
+ clutch(S_,api){
+  const g=new THREE.Group();S_.root.add(g);g.position.y=.05;
+  const dX=(r,w,c,o,l,seg=36)=>{const m=holo(new THREE.CylinderGeometry(r,r,w,seg),c,o,l);m.rotation.z=Math.PI/2;return m};
+  const mark=(x,r,c,l)=>{const m=holo(new THREE.BoxGeometry(.03,.12,.06),c,.5,l);m.position.set(x,r,0);return m};
+  const block=holo(new THREE.BoxGeometry(.5,1.1,1.0),HOLO,.03,"Motor",.3);block.position.x=-1.35;g.add(block);
+  const eng=new THREE.Group();g.add(eng);
+  const ks=dX(.06,.6,AMBER,.3,"Kurbelwelle",12);ks.position.x=-.95;eng.add(ks);
+  const fw=dX(.74,.12,AMBER,.12,"Schwungrad");fw.position.x=-.6;eng.add(fw,mark(-.6,.66,AMBER,"Schwungrad"));
+  const pg=new THREE.Group();eng.add(pg);
+  const pp=dX(.64,.07,HOLO,.16,"Druckplatte");pp.position.x=-.44;pg.add(pp,mark(-.44,.56,HOLO,"Druckplatte"));
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2;const f=holo(new THREE.BoxGeometry(.02,.3,.06),0xb9f3ff,.35,"Membranfeder");f.position.set(-.38,Math.cos(a)*.33,Math.sin(a)*.33);f.rotation.x=a;pg.add(f)}
+  const cover=holo(new THREE.CylinderGeometry(.7,.7,.2,36,1,true),HOLO,.03,"Kupplungsdeckel",.3);cover.rotation.z=Math.PI/2;cover.position.x=-.43;eng.add(cover);
+  const dg=new THREE.Group();g.add(dg);
+  const disc=dX(.6,.02,0xb9f3ff,.12,"Kupplungsscheibe");disc.position.x=-.5;dg.add(disc);
+  [-.525,-.475].forEach(x=>{const r=holo(new THREE.RingGeometry(.4,.6,36),AMBER,.28,"Reibbelag",.6);r.rotation.y=Math.PI/2;r.position.x=x;dg.add(r)});
+  dg.add(mark(-.5,.5,AMBER,"Kupplungsscheibe"));
+  const sh=dX(.055,1.9,OKC,.3,"Getriebeeingangswelle",12);sh.position.x=.4;dg.add(sh);
+  const brg=dX(.15,.1,OKC,.25,"Ausrücklager",24);g.add(brg);
+  const gb=holo(new THREE.BoxGeometry(.5,.9,.9),HOLO,.03,"Getriebe",.3);gb.position.x=1.3;g.add(gb);
+  const bell=holo(new THREE.CylinderGeometry(.6,.82,.7,36,1,true),HOLO,.02,"Kupplungsglocke",.18);bell.rotation.z=Math.PI/2;bell.position.x=.05;g.add(bell);
+  let manual=false,hold=false,p=0,t=0,ae=0,ad=0,wd=0;const we=6;
+  api.btns([{label:"Pedal",big:true,title:"Gedrückt halten",hold:v=>{manual=true;hold=v}}]);
+  S_.add(dt=>{const sp=api.speed();t+=dt*sp;
+    let target;if(manual)target=hold?1:0;else{const c=t%7;target=c<2?0:c<2.5?(c-2)/.5:c<4?1:c<5.8?1-(c-4)/1.8:0}
+    const rate=target>p?2.5:(manual?.7:3);p+=Math.sign(target-p)*Math.min(Math.abs(target-p),rate*dt*Math.max(sp,.35));
+    const e=Math.max(0,Math.min(1,1-p/.55));
+    wd+=(e>0?(we-wd)*Math.min(1,e*e*dt*5*Math.max(sp,.1)):-wd*Math.min(1,dt*2));
+    if(e>=.999)wd=we;
+    ae+=we*dt*sp;ad+=wd*dt*sp;eng.rotation.x=ae;dg.rotation.x=ad;
+    pg.position.x=(1-e)*.08;dg.position.x=(1-e)*.03;brg.position.x=-.26-p*.05;
+    const rpm=n=>Math.round(n/we*900/10)*10;
+    const st=e>=.999?["Eingekuppelt","Pedal oben · alles dreht gemeinsam"]:e<=0?["Ausgekuppelt","Pedal getreten · Motor dreht frei"]:["Schleifpunkt","Belag rutscht · Scheibe holt auf"];
+    api.hud(st[0],`${st[1]} · Motor ${rpm(we)} · Getriebe ${rpm(wd)} U/min`)});
+  return {dist:5.4,rotY:-.75,rotX:.25};
+ },
+ gearbox(S_,api){
+  const g=new THREE.Group();S_.root.add(g);g.position.y=.05;
+  const gearGeo=(r,w)=>{const n=Math.max(8,Math.round(r*52)),sh=new THREE.Shape(),rr=r-.03,rt=r+.025;
+    for(let i=0;i<n;i++){const a=i/n*Math.PI*2,s=Math.PI*2/n;const pts=[[rr,a],[rt,a+s*.25],[rt,a+s*.5],[rr,a+s*.75]];pts.forEach(([R,A],k)=>{const x=Math.cos(A)*R,y=Math.sin(A)*R;i===0&&k===0?sh.moveTo(x,y):sh.lineTo(x,y)})}
+    sh.closePath();const geo=new THREE.ExtrudeGeometry(sh,{depth:w,bevelEnabled:false,curveSegments:1});geo.translate(0,0,-w/2);geo.rotateY(Math.PI/2);return geo};
+  const yi=.32,yo=-.28,X=[-.75,-.25,.25,.75],RI=[.18,.24,.30,.34],RO=RI.map(r=>.6-r);
+  const ig=new THREE.Group();ig.position.y=yi;g.add(ig);
+  const ish=holo(new THREE.CylinderGeometry(.045,.045,2.3,10),AMBER,.3,"Eingangswelle");ish.rotation.z=Math.PI/2;ig.add(ish);
+  X.forEach((x,i)=>{const m=holo(gearGeo(RI[i],.12),HOLO,.14,"Festrad ("+(i+1)+". Gang)",.7);m.position.x=x;ig.add(m)});
+  const og=new THREE.Group();og.position.y=yo;g.add(og);
+  const osh=holo(new THREE.CylinderGeometry(.045,.045,2.3,10),AMBER,.3,"Abtriebswelle");osh.rotation.z=Math.PI/2;og.add(osh);
+  const muffe=holo(new THREE.CylinderGeometry(.13,.13,.08,20),OKC,.3,"Schaltmuffe");muffe.rotation.z=Math.PI/2;og.add(muffe);
+  const loose=X.map((x,i)=>{const gr=new THREE.Group();gr.position.set(x,yo,0);const m=holo(gearGeo(RO[i],.12),HOLO,.1,"Losrad ("+(i+1)+". Gang)",.6);gr.add(m);g.add(gr);return gr});
+  const tag=new THREE.Mesh(new THREE.ConeGeometry(.06,.14,10),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false}));tag.rotation.z=-Math.PI/2;tag.position.set(-1.3,yi,0);tag.userData.label="Kraft vom Motor";g.add(tag);
+  let gear=0,auto=true,t=0,ai=0,ao=0,wo=0,mx=0;const wi=4.2;
+  const bs=api.btns(["N","1","2","3","4"].map((l,k)=>({label:l,title:k?k+". Gang":"Leerlauf",click:()=>{auto=false;gear=k;mark()}})));
+  function mark(){bs.forEach((b,k)=>b.setAttribute("aria-pressed",k===gear));loose.forEach((gr,k)=>{tint(gr.children[0],k===gear-1?OKC:HOLO);gr.children[0].userData.mats[0].opacity=k===gear-1?.3:.1})}
+  mark();
+  S_.add(dt=>{const sp=api.speed();t+=dt*sp;
+    if(auto){const ng=Math.floor(t/2.8)%5;if(ng!==gear){gear=ng;mark()}}
+    const target=gear?-wi*RI[gear-1]/RO[gear-1]:0;
+    const tx=gear?X[gear-1]+.13:0;mx+=(tx-mx)*Math.min(1,dt*8);muffe.position.x=mx;
+    wo+=(target-wo)*Math.min(1,dt*(gear?6:1.5));
+    ai+=wi*dt*sp;ao+=wo*dt*sp;ig.rotation.x=ai;og.rotation.x=ao;
+    loose.forEach((gr,k)=>{if(k===gear-1&&Math.abs(wo-target)<.05)gr.rotation.x=ao;else gr.rotation.x+= -wi*RI[k]/RO[k]*dt*sp});
+    if(gear){const r=RO[gear-1]/RI[gear-1];api.hud(gear+". Gang",`Übersetzung ${r.toFixed(2).replace(".",",")} : 1 · Ausgang dreht mit ${Math.round(100/r)} % der Motordrehzahl`)}
+    else api.hud("Leerlauf (N)","Kein Gang drin · Losräder drehen frei, Ausgang steht")});
+  return {dist:5,rotY:-.6,rotX:.3};
+ },
+ diff(S_,api){
+  const g=new THREE.Group();S_.root.add(g);g.position.y=.1;
+  const cage=new THREE.Group();g.add(cage);
+  cage.add(holo(new THREE.SphereGeometry(.34,12,8),HOLO,.03,"Ausgleichsgehäuse",.3));
+  const ring=holo(new THREE.CylinderGeometry(.62,.55,.08,44),AMBER,.16,"Tellerrad");ring.rotation.z=Math.PI/2;ring.position.x=.4;cage.add(ring);
+  const bolt=holo(new THREE.CylinderGeometry(.03,.03,.56,8),0xb9f3ff,.3,"Ausgleichsbolzen");cage.add(bolt);
+  const spiders=[1,-1].map(s=>{const sg=new THREE.Group();sg.position.y=s*.2;const m=holo(s>0?new THREE.CylinderGeometry(.12,.06,.1,12):new THREE.CylinderGeometry(.06,.12,.1,12),OKC,.3,"Ausgleichskegelrad");sg.add(m);cage.add(sg);return sg});
+  const sides=[-1,1].map(s=>{const sg=new THREE.Group();g.add(sg);
+    const m=holo(s<0?new THREE.CylinderGeometry(.13,.06,.1,12):new THREE.CylinderGeometry(.06,.13,.1,12),HOLO,.25,"Achswellenrad ("+(s<0?"links":"rechts")+")");m.rotation.z=Math.PI/2;m.position.x=s*.22;
+    const ax=holo(new THREE.CylinderGeometry(.035,.035,1.05,10),AMBER,.3,"Achswelle ("+(s<0?"links":"rechts")+")");ax.rotation.z=Math.PI/2;ax.position.x=s*.78;
+    const wh=holo(new THREE.TorusGeometry(.3,.09,10,28),HOLO,.14,"Rad "+(s<0?"links":"rechts"),.8);wh.rotation.y=Math.PI/2;wh.position.x=s*1.36;
+    const spk=holo(new THREE.BoxGeometry(.02,.5,.04),HOLO,.3,"Rad "+(s<0?"links":"rechts"));spk.position.x=s*1.36;
+    sg.add(m,ax,wh,spk);sg.userData.wh=wh;return sg});
+  const pin=new THREE.Group();pin.position.set(.24,0,-.55);g.add(pin);
+  const pm=holo(new THREE.CylinderGeometry(.06,.11,.16,12),AMBER,.3,"Kegelrad (Antrieb)");pm.rotation.x=Math.PI/2;pin.add(pm);
+  const ps=holo(new THREE.CylinderGeometry(.04,.04,.9,10),AMBER,.3,"Kardanwelle / vom Getriebe");ps.rotation.x=Math.PI/2;ps.position.z=-.52;pin.add(ps);
+  const ag=new THREE.Group();ag.position.set(0,.85,0);g.add(ag);
+  const arrow=new THREE.Mesh(new THREE.ConeGeometry(.12,.3,12),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false}));arrow.rotation.x=-Math.PI/2;arrow.userData.label="Fahrtrichtung";ag.add(arrow);
+  let mode=0,auto=true,t=0,k=0,ac=0,aL=0,aR=0;const wc=2.6,K=[0,.38,-.38];
+  const NAMES=["Geradeaus","Linkskurve","Rechtskurve"];
+  const bs=api.btns([["↑","Geradeaus"],["↰","Linkskurve"],["↱","Rechtskurve"]].map(([l,ti],i)=>({label:l,title:ti,click:()=>{auto=false;mode=i;mk()}})));
+  function mk(){bs.forEach((b,i)=>b.setAttribute("aria-pressed",i===mode))}mk();
+  S_.add(dt=>{const sp=api.speed();t+=dt*sp;if(auto){const m=Math.floor(t/3.5)%3;if(m!==mode){mode=m;mk()}}
+    k+=(K[mode]-k)*Math.min(1,dt*3);
+    const wL=wc*(1-k),wR=wc*(1+k);ac+=wc*dt*sp;aL+=wL*dt*sp;aR+=wR*dt*sp;
+    cage.rotation.x=-ac;sides[0].rotation.x=-aL;sides[1].rotation.x=-aR;pin.rotation.z+=wc*4*dt*sp;
+    const spin=(wR-wL)/2*(.13/.12)*dt*sp;spiders[0].rotation.y+=spin;spiders[1].rotation.y-=spin;
+    ag.rotation.y=k*1.6;
+    tint(sides[0].userData.wh,k>.05?0x7fb6c9:k<-.05?OKC:HOLO);tint(sides[1].userData.wh,k<-.05?0x7fb6c9:k>.05?OKC:HOLO);
+    api.hud(NAMES[mode],`Rad links ${Math.round((1-k)*100)} % · rechts ${Math.round((1+k)*100)} % · Ausgleichsräder ${Math.abs(k)<.03?"stehen":"drehen"}`)});
+  return {dist:5.6,rotY:-.45,rotX:.4};
+ },
+
+ cooling(S_,api){
+  const g=new THREE.Group();S_.root.add(g);g.position.y=.05;
+  const blk=holo(new THREE.BoxGeometry(.85,1.0,.8),HOLO,.05,"Motorblock",.5);blk.position.set(-.95,0,0);g.add(blk);
+  const hd=holo(new THREE.BoxGeometry(.85,.22,.8),HOLO,.06,"Zylinderkopf",.5);hd.position.set(-.95,.62,0);g.add(hd);
+  const rad=holo(new THREE.BoxGeometry(.12,1.2,1.0),HOLO,.06,"Kühler",.6);rad.position.set(1.1,0,0);g.add(rad);
+  for(let i=0;i<9;i++){const f=holo(new THREE.BoxGeometry(.13,.01,1.0),HOLO,.1,"Kühler",.35);f.position.set(1.1,-.5+i*.125,0);g.add(f)}
+  const fan=new THREE.Group();fan.position.set(1.38,0,0);g.add(fan);
+  for(let i=0;i<4;i++){const b=holo(new THREE.BoxGeometry(.03,.42,.12),0xb9f3ff,.2,"Lüfter");b.position.y=.22;const w=new THREE.Group();w.rotation.x=i*Math.PI/2;w.add(b);fan.add(w)}
+  const th=holo(new THREE.CylinderGeometry(.09,.09,.16,14),AMBER,.3,"Thermostat");th.rotation.z=Math.PI/2;th.position.set(-.25,.55,0);g.add(th);
+  const pump=holo(new THREE.CylinderGeometry(.13,.13,.12,16),OKC,.3,"Wasserpumpe");pump.rotation.x=Math.PI/2;pump.position.set(-.35,-.45,.0);g.add(pump);
+  const tank=holo(new THREE.BoxGeometry(.3,.22,.22),HOLO,.12,"Ausgleichsbehälter",.6);tank.position.set(.45,.95,0);g.add(tank);
+  const big=flow(g,[[-.95,-.35,0],[-.95,.5,0],[-.25,.55,0],[1.05,.55,0],[1.05,-.45,0],[-.35,-.45,0],[-.95,-.35,0]],34,0xff6a3a,.045,"Kühlmittelleitung");
+  const small=flow(g,[[-.95,-.35,0],[-.95,.5,0],[-.25,.55,0],[-.3,-.35,0],[-.35,-.45,0],[-.95,-.35,0]],22,0xff6a3a,.045,"Kleiner Kreislauf");
+  const cC=new THREE.Color(HOLO),cH=new THREE.Color(0xff5a3a),tmp=new THREE.Color();
+  const tc=T=>tmp.copy(cC).lerp(cH,Math.max(0,Math.min(1,(T-20)/75)));
+  let T=20,o=0;
+  api.btns([{label:"Kaltstart",title:"Motor kalt starten",click:()=>{T=20;o=0}}]);
+  S_.add(dt=>{const sp=api.speed();
+    o+=((T>=86?Math.min(1,(T-86)/6):0)-o)*Math.min(1,dt*2);
+    T=Math.max(20,Math.min(98,T+dt*sp*(9-o*14)));
+    const ff=big.fr,cool=f=>f<ff[3]?tc(T):f<ff[4]?tc(T-(f-ff[3])/(ff[4]-ff[3])*28):tc(T-28);
+    big.step(dt*sp*.9,o,cool);small.step(dt*sp*.9,1-o*.85,()=>tc(T));
+    tint(th,o>.05?OKC:AMBER);fan.rotation.x+=dt*sp*o*14;
+    api.hud(`Kühlmittel ${Math.round(T)} °C`,o<.05?"Thermostat zu · kleiner Kreislauf durch den Motor":"Thermostat offen · Kühlmittel fließt durch den Kühler")});
+  return {dist:5.6,rotY:-.35,rotX:.25};
+ },
+ oil(S_,api){
+  const g=new THREE.Group();S_.root.add(g);g.position.y=.05;
+  g.add(Object.assign(holo(new THREE.BoxGeometry(1.7,1.25,.8),HOLO,.02,"Motorblock",.3),{}));
+  const crank=new THREE.Group();crank.position.y=-.1;g.add(crank);
+  const cs=holo(new THREE.CylinderGeometry(.06,.06,1.6,12),AMBER,.3,"Kurbelwelle");cs.rotation.z=Math.PI/2;crank.add(cs);
+  [-.6,0,.6].forEach(x=>{const w=holo(new THREE.BoxGeometry(.05,.3,.12),AMBER,.25,"Kurbelwelle");w.position.set(x+.15,.1,0);crank.add(w);const w2=w.clone();w2.position.x=x-.15;crank.add(w2)});
+  [-.6,0,.6].forEach(x=>{const b=holo(new THREE.TorusGeometry(.1,.025,8,20),OKC,.4,"Kurbelwellenlager");b.rotation.y=Math.PI/2;b.position.set(x,-.1,0);g.add(b)});
+  const cam=holo(new THREE.CylinderGeometry(.04,.04,1.5,10),AMBER,.3,"Nockenwelle");cam.rotation.z=Math.PI/2;cam.position.y=.72;g.add(cam);
+  const pan=holo(new THREE.BoxGeometry(1.5,.38,.7),AMBER,.04,"Ölwanne",.5);pan.position.y=-.82;g.add(pan);
+  const oilM=new THREE.MeshBasicMaterial({color:AMBER,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false});
+  const oilV=new THREE.Mesh(new THREE.BoxGeometry(1.48,1,.68),oilM);oilV.userData.label="Motoröl";g.add(oilV);
+  const pump=holo(new THREE.CylinderGeometry(.11,.11,.1,12),OKC,.3,"Ölpumpe");pump.rotation.x=Math.PI/2;pump.position.set(.45,-.45,0);g.add(pump);
+  const filt=holo(new THREE.CylinderGeometry(.11,.11,.26,14),0xb9f3ff,.2,"Ölfilter");filt.position.set(.95,-.25,0);g.add(filt);
+  const main=flow(g,[[.3,-.9,0],[.45,-.45,0],[.95,-.3,0],[.95,.38,0],[-.6,.38,0],[-.6,-.05,0],[-.6,-.6,0],[-.1,-.85,0],[.3,-.9,0]],30,AMBER,.04,"Ölkanal");
+  const br1=flow(g,[[0,.38,0],[0,-.05,0],[0,-.7,0]],8,AMBER,.035,"Ölkanal",.02);
+  const br2=flow(g,[[.6,.38,0],[.6,-.05,0],[.6,-.7,0]],8,AMBER,.035,"Ölkanal",.02);
+  const br3=flow(g,[[.95,.38,0],[.95,.72,0],[-.75,.72,0],[-.75,-.7,0]],16,AMBER,.035,"Ölkanal zur Nockenwelle",.02);
+  let run=true,low=false,a=0,pr=1,lvl=1;
+  const bs=api.btns([{label:"Motor aus",click:()=>{run=!run;bs[0].textContent=run?"Motor aus":"Motor an";bs[0].setAttribute("aria-pressed",!run)}},{label:"Wenig Öl",click:()=>{low=!low;bs[1].setAttribute("aria-pressed",low)}}]);
+  S_.add((dt,tt)=>{const sp=api.speed();lvl+=((low?.25:1)-lvl)*Math.min(1,dt*1.5);
+    const h=.12+.2*lvl;oilV.scale.y=h;oilV.position.y=-1.0+h/2;
+    const suck=low?(.55+.45*Math.sin(tt*9)>.75?0:.35):1;
+    pr+=((run?suck:0)-pr)*Math.min(1,dt*3);
+    if(run)a+=dt*sp*5;crank.rotation.x=a;cam.rotation.x=a/2;pump.rotation.y=a;
+    const v=dt*sp*1.1*pr;main.step(v,pr);br1.step(v*.6,pr);br2.step(v*.6,pr);br3.step(v*.7,pr);
+    const bar=(pr*2).toFixed(1).replace(".",",");
+    if(!run)api.hud("Motor aus","Pumpe steht · Öl läuft zurück in die Wanne");
+    else if(pr<.45)api.hud("⚠ Öldruckleuchte AN",`Pumpe saugt Luft · ca. ${bar} bar · sofort anhalten!`);
+    else api.hud("Motor läuft",`Öldruck ca. ${bar} bar · Schmierfilm an allen Lagern`)});
+  return {dist:5.4,rotY:-.35,rotX:.25};
+ },
+ electric12(S_,api){
+  const g=new THREE.Group();S_.root.add(g);g.position.y=-.05;
+  const blk=holo(new THREE.BoxGeometry(1.1,.75,.7),HOLO,.04,"Motor",.45);blk.position.set(.15,0,0);g.add(blk);
+  const fw=holo(new THREE.TorusGeometry(.42,.03,8,40),AMBER,.3,"Schwungrad mit Zahnkranz");fw.rotation.y=Math.PI/2;fw.position.set(-.5,0,0);g.add(fw);
+  const fwM=holo(new THREE.BoxGeometry(.02,.8,.04),AMBER,.3,"Schwungrad mit Zahnkranz");fwM.position.x=-.5;const fwG=new THREE.Group();fwG.add(fwM);g.add(fwG);
+  const st=holo(new THREE.CylinderGeometry(.1,.1,.4,14),OKC,.25,"Anlasser");st.rotation.z=Math.PI/2;st.position.set(-.35,-.5,.15);g.add(st);
+  const bat=holo(new THREE.BoxGeometry(.45,.32,.3),OKC,.12,"Batterie (12 V)");bat.position.set(-1.35,-.2,0);g.add(bat);
+  [[-1.47,"Minuspol"],[-1.23,"Pluspol"]].forEach(([x,l])=>{const t=holo(new THREE.CylinderGeometry(.035,.035,.08,10),l==="Pluspol"?0xff6b6b:HOLO,.4,l);t.position.set(x,-.0,0);g.add(t)});
+  const lima=holo(new THREE.CylinderGeometry(.14,.14,.22,16),HOLO,.18,"Lichtmaschine");lima.rotation.z=Math.PI/2;lima.position.set(.95,.55,.3);g.add(lima);
+  const pul=holo(new THREE.CylinderGeometry(.13,.13,.05,16),AMBER,.25,"Riemenscheibe");pul.rotation.z=Math.PI/2;pul.position.set(.75,-.2,.3);g.add(pul);
+  const belt=flow(g,[[.75,-.07,.3],[.95,.69,.3],[.95,.41,.3],[.75,-.33,.3],[.75,-.07,.3]],14,0xb9f3ff,.025,"Keilriemen",.015);
+  const coil=holo(new THREE.CylinderGeometry(.07,.07,.28,12),AMBER,.3,"Zündspule");coil.position.set(-.45,.75,-.1);g.add(coil);
+  const dist=holo(new THREE.CylinderGeometry(.12,.1,.18,14),HOLO,.2,"Zündverteiler");dist.position.set(.05,.68,-.15);g.add(dist);
+  const rot=holo(new THREE.BoxGeometry(.18,.03,.04),0xffffff,.5,"Verteilerfinger");rot.position.set(.05,.79,-.15);g.add(rot);
+  const PX=[-.25,0,.25,.5],plugs=[],fl=[];
+  PX.forEach((x,i)=>{const p=holo(new THREE.CylinderGeometry(.03,.03,.14,8),0xdfe9f0,.3,"Zündkerze "+(i+1));p.position.set(x,.43,.12);g.add(p);plugs.push(p);
+    const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(.05,.76,-.15),new THREE.Vector3((x+.05)/2,.95,0),new THREE.Vector3(x,.5,.12)]),new THREE.LineBasicMaterial({color:HOLO,transparent:true,opacity:.35}));g.add(ln);
+    const f=new THREE.Mesh(new THREE.SphereGeometry(.07,10,8),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));f.position.set(x,.33,.12);g.add(f);fl.push(f)});
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-.45,.89,-.1),new THREE.Vector3(.05,.77,-.15)]),new THREE.LineBasicMaterial({color:AMBER,transparent:true,opacity:.5})));
+  const crankF=flow(g,[[-1.23,0,0],[-1.0,-.5,.15],[-.55,-.5,.15]],10,0xfff3b0,.04,"Starterkabel",.025);
+  const chargeF=flow(g,[[.95,.55,.45],[.2,1.15,.45],[-1.0,1.0,.2],[-1.23,.02,0]],14,OKC,.035,"Ladekabel",.02);
+  let state=0,hold=false,crankT=0,a=0,fire=0,fA=0;const ORD=[0,2,3,1];
+  const bs=api.btns([{label:"Starten",big:true,title:"Gedrückt halten",hold:v=>{hold=v;if(!v&&state===1){state=0;crankT=0}}},{label:"Aus",click:()=>{state=0;crankT=0}}]);
+  S_.add(dt=>{const sp=api.speed();
+    if(hold&&state===0)state=1;
+    if(state===1){crankT+=dt*sp;if(crankT>1.6){state=2;hold=false;bs[0].setAttribute("aria-pressed","false")}}
+    const w=state===2?5:state===1?2.2:0;a+=w*dt*sp;fwG.rotation.x=a;pul.rotation.x=a;lima.rotation.x=a*1.8;rot.rotation.y=-a/2;
+    belt.step(w*.06*dt*sp*3,w?1:.15);crankF.step(dt*sp*1.6,state===1?1:0);chargeF.step(dt*sp*.8,state===2?1:0);
+    tint(st,state===1?0xfff3b0:OKC);
+    fl.forEach(f=>f.material.opacity*=Math.pow(.02,dt*sp));
+    if(w){fA+=w*dt*sp;if(fA>Math.PI/2){fA-=Math.PI/2;const c=ORD[fire%4];fire++;fl[c].material.opacity=.95;api._c=c+1}}
+    if(state===0)api.hud("Zündung aus","Batterie ca. 12,6 V · halte „Starten“ gedrückt");
+    else if(state===1)api.hud("Anlasser dreht den Motor","Batterie bricht kurz ein: ca. 10,5 V");
+    else api.hud("Motor läuft",`Lichtmaschine lädt · ca. 14 V · Zündfolge 1-3-4-2 · Funke Zyl. ${api._c||1}`)});
+  return {dist:5.6,rotY:-.4,rotX:.3};
+ },
+ brake(S_,api){
+  const g=new THREE.Group();S_.root.add(g);g.position.set(.35,-.05,0);
+  const wheel=new THREE.Group();g.add(wheel);
+  const dM=new THREE.MeshBasicMaterial({color:HOLO,transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  const disc=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.06,40),dM);disc.rotation.z=Math.PI/2;disc.userData.label="Bremsscheibe";wheel.add(disc);
+  const dE=new THREE.LineSegments(new THREE.EdgesGeometry(disc.geometry,24),new THREE.LineBasicMaterial({color:HOLO,transparent:true,opacity:.8,blending:THREE.AdditiveBlending}));dE.rotation.z=Math.PI/2;wheel.add(dE);
+  for(let i=0;i<6;i++){const a=i/6*Math.PI*2;const h=holo(new THREE.BoxGeometry(.07,.05,.05),HOLO,.4,"Bremsscheibe");h.position.set(0,Math.cos(a)*.38,Math.sin(a)*.38);wheel.add(h)}
+  const tire=holo(new THREE.TorusGeometry(.8,.14,10,40),HOLO,.05,"Rad",.3);tire.rotation.y=Math.PI/2;tire.position.x=.25;wheel.add(tire);
+  const cal=holo(new THREE.BoxGeometry(.32,.26,.36),AMBER,.12,"Bremssattel",.7);cal.position.set(0,.5,0);g.add(cal);
+  const pads=[-1,1].map(s=>{const p=holo(new THREE.BoxGeometry(.04,.2,.3),0xffe08a,.35,"Bremsbelag");p.position.set(s*.09,.47,0);g.add(p);return p});
+  const mc=holo(new THREE.CylinderGeometry(.09,.09,.4,14),OKC,.2,"Hauptbremszylinder");mc.rotation.z=Math.PI/2;mc.position.set(-1.35,.95,0);g.add(mc);
+  const bkv=holo(new THREE.CylinderGeometry(.25,.25,.18,24),HOLO,.06,"Bremskraftverstärker",.5);bkv.rotation.z=Math.PI/2;bkv.position.set(-1.65,.95,0);g.add(bkv);
+  const pedal=new THREE.Group();pedal.position.set(-1.9,.95,0);g.add(pedal);
+  const pl=holo(new THREE.BoxGeometry(.04,.7,.06),0xdfe9f0,.3,"Bremspedal");pl.position.y=-.35;pedal.add(pl);
+  const pp=holo(new THREE.BoxGeometry(.06,.05,.2),0xdfe9f0,.4,"Bremspedal");pp.position.y=-.7;pedal.add(pp);
+  const line=flow(g,[[-1.15,.95,0],[-.5,.95,0],[-.2,.75,0],[0,.63,0]],10,0xffe08a,.035,"Bremsleitung",.02);
+  let hold=false,manual=false,v=80,heat=0,p=0,t=0,ang=0;
+  api.btns([{label:"Bremsen",big:true,title:"Gedrückt halten",hold:x=>{manual=true;hold=x}}]);
+  const cool=new THREE.Color(HOLO),hot=new THREE.Color(0xff5020);
+  S_.add(dt=>{const sp=api.speed();t+=dt*sp;
+    const want=manual?(hold?1:0):((t%6)>3.5&&(t%6)<5.3?1:0);
+    p+=(want-p)*Math.min(1,dt*sp*8);
+    v=Math.max(0,v-p*30*dt*sp);if(p<.1)v=Math.min(80,v+10*dt*sp);
+    heat+=v*p*dt*sp*2.4;heat-=heat*.08*dt*sp;
+    ang+=v/80*9*dt*sp;wheel.rotation.x=-ang;
+    pads[0].position.x=-.09+p*.035;pads[1].position.x=.09-p*.035;pedal.rotation.z=p*.35;
+    line.step(dt*sp*(want>p?.6:-.4)*Math.abs(want-p)*4,.25+.75*p);
+    const T=Math.round(40+heat);dM.color.copy(cool).lerp(hot,Math.min(1,heat/350));dM.opacity=.14+.25*Math.min(1,heat/350);
+    api.hud(p>.3?"Bremsen":"Rollen",`Tempo ${Math.round(v)} km/h · Scheibe ca. ${T} °C`)});
+  return {dist:5.6,rotY:-.9,rotX:.25};
+ },
+ suspension(S_,api){
+  const g=new THREE.Group();S_.root.add(g);g.position.y=-.4;
+  const roadF=x=>{const m=((x%4)+4)%4;return .2*Math.exp(-Math.pow(m-2,2)/.06)};
+  const N=60,rp=[];for(let i=0;i<N;i++)rp.push(new THREE.Vector3(0,0,0));
+  const rg=new THREE.BufferGeometry().setFromPoints(rp);const road=new THREE.Line(rg,new THREE.LineBasicMaterial({color:HOLO,transparent:true,opacity:.8}));g.add(road);
+  const ground=holo(new THREE.PlaneGeometry(.9,3.2),HOLO,.05,"Straße",.2);ground.rotation.x=-Math.PI/2;ground.position.y=-.31;g.add(ground);
+  const wheel=holo(new THREE.TorusGeometry(.3,.1,10,30),HOLO,.14,"Rad",.8);wheel.rotation.y=Math.PI/2;g.add(wheel);
+  const body=holo(new THREE.BoxGeometry(.9,.3,1.6),HOLO,.08,"Karosserie",.6);g.add(body);
+  const rings=[];for(let i=0;i<8;i++){const r=holo(new THREE.TorusGeometry(.16,.02,6,20),OKC,.3,"Feder");r.rotation.x=Math.PI/2;r.position.z=-.25;g.add(r);rings.push(r)}
+  const dOut=holo(new THREE.CylinderGeometry(.06,.06,.35,12),AMBER,.25,"Stoßdämpfer");dOut.position.z=.25;g.add(dOut);
+  const dRod=holo(new THREE.CylinderGeometry(.025,.025,1,8),AMBER,.3,"Stoßdämpfer");dRod.position.z=.25;g.add(dRod);
+  const arm=holo(new THREE.BoxGeometry(.06,.05,.7),0xdfe9f0,.25,"Radaufhängung");g.add(arm);
+  let damp=true,s=0,yb=1.05,vb=0,ywPrev=0;const K=70,REST=.75;
+  const bs=api.btns([{label:"Dämpfer ok",click:()=>{damp=true;mk()}},{label:"Dämpfer kaputt",click:()=>{damp=false;mk()}}]);
+  function mk(){bs[0].setAttribute("aria-pressed",damp);bs[1].setAttribute("aria-pressed",!damp)}mk();
+  S_.add(dt=>{const sp=api.speed(),h=dt*sp;s+=h*1.2;
+    for(let i=0;i<N;i++){const z=-1.6+i*3.2/(N-1);rp[i].set(0,roadF(s+z)-.3,z)}rg.setFromPoints(rp);
+    const yw=roadF(s)+.0,vw=h>0?(yw-ywPrev)/h:0;ywPrev=yw;
+    const C=damp?11:.8;const n=4;for(let k=0;k<n;k++){const a=-K*(yb-yw-REST)-C*(vb-vw);vb+=a*h/n;yb+=vb*h/n}
+    wheel.position.set(0,yw,0);body.position.set(0,yb+.15,0);arm.position.set(0,yw,0);
+    const top=yb,bot=yw+.05;rings.forEach((r,i)=>r.position.y=bot+(top-bot)*(i+.5)/8);
+    dOut.position.y=bot+.18;const rl=Math.max(.05,top-(bot+.35));dRod.scale.y=rl;dRod.position.y=bot+.35+rl/2;
+    const sw=Math.abs(vb)>.25;api.hud(damp?"Mit Stoßdämpfer":"Dämpfer kaputt",damp?"Feder fängt den Stoß, der Dämpfer bremst das Nachwippen":sw?"Die Karosserie wippt lange nach":"Gleich kommt die nächste Bodenwelle")});
+  return {dist:4.6,rotY:-1.25,rotX:.2};
+ },
+ car(S_,api,opts){
+  const car=CARS[opts.car],v=car.variants[opts.v||0],L=car.layout;
+  const g=new THREE.Group();S_.root.add(g);g.position.y=-.6;
+  const len=3.6,wid=1.6;
+  const body=holo(new THREE.BoxGeometry(wid,.85,len),HOLO,.04,car.name,.35);body.position.y=.65;g.add(body);
+  const floor=holo(new THREE.PlaneGeometry(wid,len),HOLO,.05,"Bodengruppe",.25);floor.rotation.x=-Math.PI/2;floor.position.y=.2;g.add(floor);
+  const front=new THREE.Mesh(new THREE.ConeGeometry(.12,.3,12),new THREE.MeshBasicMaterial({color:OKC,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false}));front.rotation.x=Math.PI/2;front.position.set(0,1.25,len/2-.1);front.userData.label="Fahrtrichtung (vorne)";g.add(front);
+  const zf=1.18,zr=-1.18,wheels=[];
+  [[zf,"front"],[zr,"rear"]].forEach(([z,ax])=>{const drv=L.drive===ax||L.drive==="awd";[1,-1].forEach(s=>{const w=holo(new THREE.TorusGeometry(.3,.09,10,28),drv?OKC:HOLO,drv?.28:.1,(ax==="front"?"Vorderrad":"Hinterrad")+(drv?" (angetrieben)":""),drv?.95:.45);w.rotation.y=Math.PI/2;w.position.set(s*(wid/2+.02),.3,z);w.userData.drv=drv;g.add(w);wheels.push(w)})});
+  const e=buildEngine(ENGINES[v.eng]);const sc=v.eng.startsWith("boxer")?.5:.46;e.grp.scale.setScalar(sc);
+  const holder=new THREE.Group();holder.add(e.grp);
+  if(L.orient==="long")holder.rotation.y=Math.PI/2;
+  const flat=v.eng.startsWith("boxer");e.grp.position.y=flat?.0:-.25;
+  const zE=L.engine==="front"?(L.orient==="long"?1.25:1.15):(flat?-1.25:-1.3);holder.position.set(0,flat?.42:.5,zE);g.add(holder);
+  const gbz=L.engine==="front"?(L.orient==="long"?.62:1.15):-.72;
+  const gb=holo(new THREE.BoxGeometry(L.orient==="trans"?.3:.32,.28,L.orient==="trans"?.32:.45),AMBER,.18,"Getriebe mit Differential");
+  gb.position.set(L.orient==="trans"?.55:0,.38,gbz);
+  if(L.engine==="front"&&L.drive==="rear"){gb.position.z=.55;gb.userData.label="Getriebe";const sh=holo(new THREE.CylinderGeometry(.04,.04,1.55,8),AMBER,.3,"Kardanwelle");sh.rotation.x=Math.PI/2;sh.position.set(0,.32,-.42);g.add(sh);const df=holo(new THREE.SphereGeometry(.17,14,10),AMBER,.22,"Differential");df.position.set(0,.3,zr);g.add(df)}
+  g.add(gb);
+  const lbl=(L.engine==="front"?"Motor vorne":"Motor hinten")+(L.orient==="long"?", längs":", quer");
+  const dl=L.drive==="front"?"Frontantrieb":L.drive==="rear"?"Hinterradantrieb":"Allrad";
+  let th=0;S_.add(dt=>{th+=dt*api.speed()*2.4;e.update(th);wheels.forEach(w=>{if(w.userData.drv)w.rotation.x=-th*.5});api.hud(car.name,`${lbl} · ${dl}`)});
+  return {dist:6.6,rotY:-.8,rotX:.45};
+ }
+};
+
+let ACTIVE=null; // {stage,key,el}
+function mountScene(el,scene,opts){
+  killScene();
+  const hud=document.createElement("div");hud.className="hud";hud.innerHTML='<div><div class="h1"></div><div class="h2"></div></div>';
+  const pk=document.createElement("button");pk.className="pick hide";pk.type="button";pk.addEventListener("click",()=>{if(pk.dataset.term)openTerm(pk.dataset.term)});
+  const hint=document.createElement("div");hint.className="hint";hint.textContent="Ziehen zum Drehen · Teil antippen";
+  const ctrl=document.createElement("div");ctrl.className="ctrl";ctrl.innerHTML='<button data-c="slow" aria-pressed="false" title="Zeitlupe">½</button><button data-c="play" aria-pressed="false" title="Pause">❚❚</button>';
+  el.append(hud,pk,hint,ctrl);
+  let paused=false,slow=false,pt=0;
+  const h1=hud.querySelector(".h1"),h2=hud.querySelector(".h2");let lastH="";
+  const api={speed:()=>paused?0:slow?.35:1,hud:(a,b)=>{const s=a+"|"+b;if(s!==lastH){lastH=s;h1.textContent=a;h2.textContent=b}}};
+  ctrl.addEventListener("click",ev=>{const b=ev.target.closest("button");if(!b)return;if(b.dataset.c==="slow"){slow=!slow;b.setAttribute("aria-pressed",slow)}else{paused=!paused;b.setAttribute("aria-pressed",paused);b.textContent=paused?"▶":"❚❚"}});
+  api.btns=(defs)=>{const box=document.createElement("div");box.className="sbtns";hint.hidden=true;
+    const bs=defs.map(d=>{const b=document.createElement("button");b.type="button";b.textContent=d.label;if(d.big)b.className="big";if(d.title)b.title=d.title;b.setAttribute("aria-pressed","false");
+      if(d.hold){const on=e=>{e.preventDefault();b.setAttribute("aria-pressed","true");d.hold(true)},off=()=>{if(b.getAttribute("aria-pressed")==="true"){b.setAttribute("aria-pressed","false");d.hold(false)}};
+        b.addEventListener("pointerdown",on);b.addEventListener("pointerup",off);b.addEventListener("pointerleave",off);b.addEventListener("pointercancel",off);b.addEventListener("contextmenu",e=>e.preventDefault())}
+      else b.addEventListener("click",()=>d.click());box.append(b);return b});
+    el.append(box);return bs};
+  let stage;
+  try{stage=makeStage(el)}catch(err){el.insertAdjacentHTML("beforeend",'<div class="hud"><div class="h2">3D ist auf diesem Gerät gerade nicht verfügbar.</div></div>');return}
+  const cfg=SCENES[scene](stage,api,opts||{})||{};
+  if(cfg.dist){stage.st.dist=cfg.dist}if(cfg.rotY!=null)stage.st.rotY=cfg.rotY;if(cfg.rotX!=null)stage.st.rotX=cfg.rotX;
+  stage.st.onPick=l=>{const k=findTerm(l);pk.dataset.term=k||"";pk.textContent=l+(k?"  ⓘ":"");pk.classList.remove("hide");hint.hidden=true;clearTimeout(pt);pt=setTimeout(()=>pk.classList.add("hide"),k?4500:2200)};
+  ACTIVE={stage,key:scene+JSON.stringify(opts||{}),el};
+}
+function killScene(){if(ACTIVE){ACTIVE.stage&&ACTIVE.stage.dispose();ACTIVE.el.querySelectorAll(".hud,.pick,.hint,.ctrl,.sbtns").forEach(n=>n.remove());ACTIVE=null}}
+
+
+/* ============ GLOSSARY ============ */
+// [Schlüssel, Regex (ohne Fanggruppen), Anzeigename, Erklärung, Link (Lektion "l3" oder Motor "m:boxer")]
+const GL=[
+ ["antriebsstrang","Antriebsstrangs?","Antriebsstrang","Alle Teile, die die Kraft vom Motor zu den Rädern bringen: Kupplung, Getriebe, Wellen und Differential.","l1"],
+ ["motor","Motors?|Verbrennungsmotors?","Motor","Wandelt die Energie im Kraftstoff in eine Drehung um. Beim Verbrennungsmotor verbrennt dafür Kraftstoff in den Zylindern.","l2"],
+ ["kupplung","Kupplung(?:en)?","Kupplung","Trennt den Motor vom Getriebe, solange du das Pedal trittst. So kannst du anfahren und schalten, ohne dass der Motor ausgeht.","l6"],
+ ["getriebe","Getriebes?|Schaltgetriebes?|Gänge|Gängen","Getriebe","Zahnräder in verschiedenen Größen, die Gänge. Kleine Gänge geben viel Kraft zum Anfahren, große Gänge viel Tempo bei niedriger Drehzahl.","l7"],
+ ["automatik","Automatik","Automatik","Ein Getriebe, das die Gänge selbst wechselt. Statt Kupplungspedal gibt es einen Wandler, der beim Anfahren weich verbindet.",null],
+ ["differential","Differentials?|Differenzial","Differential","Ein Zahnradsatz zwischen den angetriebenen Rädern. Er lässt das äußere Rad in der Kurve schneller drehen als das innere.","l8"],
+ ["schwungrad","Schwungrads?|Schwungrades","Schwungrad","Schwere Scheibe an der Kurbelwelle. Sie speichert Schwung, damit der Motor zwischen den Arbeitstakten gleichmäßig weiterdreht. Die Kupplung drückt dagegen.","l6"],
+ ["kscheibe","Kupplungsscheiben?|Scheibe","Kupplungsscheibe","Dünne Scheibe mit Reibbelag zwischen Schwungrad und Druckplatte. Sie sitzt auf der Getriebeeingangswelle.","l6"],
+ ["belag","Reibbelags?|Reibbelägen?|Belags?","Reibbelag","Die griffige Schicht auf der Kupplungsscheibe, ähnlich wie bei Bremsbelägen. Sie nutzt sich beim Anfahren ab.","l6"],
+ ["druckplatte","Druckplatten?","Druckplatte","Presst die Kupplungsscheibe mit Federkraft gegen das Schwungrad.","l6"],
+ ["membranfeder","Membranfedern?|Federzungen","Membranfeder","Eine tellerförmige Feder mit Zungen in der Mitte. Sie liefert die Anpresskraft der Kupplung. Drückt man innen auf die Zungen, lässt sie außen los.","l6"],
+ ["ausruecklager","Ausrücklagers?","Ausrücklager","Ein Kugellager, das beim Treten des Pedals auf die Federzungen der Kupplung drückt und sie so löst.","l6"],
+ ["glocke","Kupplungsglocken?","Kupplungsglocke","Der glockenförmige Teil des Getriebegehäuses, in dem die Kupplung sitzt. Daran wird der Motor angeschraubt.","l6"],
+ ["schleifpunkt","Schleifpunkts?","Schleifpunkt","Die Pedalstellung, ab der die Kupplung zu greifen beginnt. Hier rutscht sie noch etwas, deshalb fährt man dort sanft an.","l6"],
+ ["eingangswelle","Getriebeeingangswellen?|Eingangswellen?","Eingangswelle","Die Welle, über die die Kraft von der Kupplung ins Getriebe kommt.","l7"],
+ ["abtrieb","Abtriebswellen?","Abtriebswelle","Die Welle, über die die Kraft das Getriebe Richtung Räder verlässt.","l7"],
+ ["uebersetzung","Übersetzungen?","Übersetzung","Das Verhältnis der Drehzahlen. 3 : 1 heißt: Die Eingangsseite dreht dreimal, die Ausgangsseite einmal, dafür mit dreifacher Kraft.","l7"],
+ ["drehmoment","Drehmoments?","Drehmoment","Die Drehkraft, also wie stark etwas dreht. Angabe in Newtonmeter (Nm). Viel Drehmoment heißt kräftiges Anziehen.","l7"],
+ ["losrad","Losrädern?|Losrads?|Losrad","Losrad","Ein Zahnrad, das sich frei auf seiner Welle dreht, bis die Schaltmuffe es festmacht.","l7"],
+ ["festrad","Festrädern?|Festrads?|Festrad","Festrad","Ein Zahnrad, das fest mit seiner Welle verbunden ist.","l7"],
+ ["muffe","Schaltmuffen?","Schaltmuffe","Ein verschiebbarer Ring mit Zähnen. Er verbindet beim Schalten ein Losrad fest mit der Welle.","l7"],
+ ["synchro","Synchronringen?|Synchronring|Synchronisierung","Synchronring","Ein Reibring im Getriebe. Er gleicht vor dem Einrasten die Drehzahlen an, damit nichts kracht.","l7"],
+ ["rueckwaerts","Rückwärtsgangs?|Rückwärtsgang","Rückwärtsgang","Der Gang zum Rückwärtsfahren. Ein Zwischenrad kehrt die Drehrichtung um.","l7"],
+ ["zwischenrad","Zwischenrads?|Zwischenrad","Zwischenrad","Ein zusätzliches Zahnrad zwischen zwei anderen. Es ändert die Drehrichtung, nicht die Übersetzung.","l7"],
+ ["leerlauf","Leerlaufs?|Leerlauf","Leerlauf","Der Motor läuft, aber es ist kein Gang drin oder die Kupplung ist getreten. Die Drehzahl liegt dann bei etwa 800 bis 900 U/min.",null],
+ ["tellerrad","Tellerrads?|Tellerrad","Tellerrad","Das große, schräg verzahnte Rad am Differential. Es wird vom Kegelrad angetrieben.","l8"],
+ ["kegelrad","Kegelrads?|Kegelrad","Kegelrad","Ein Zahnrad in Kegelform. Es lenkt die Drehung um 90 Grad um, zum Beispiel von der Kardanwelle auf die Achse.","l8"],
+ ["ausgleichsgehaeuse","Ausgleichsgehäuses?","Ausgleichsgehäuse","Das Gehäuse im Differential. Es dreht mit dem Tellerrad und trägt die Ausgleichskegelräder.","l8"],
+ ["ausgleichsraeder","Ausgleichskegelrädern?|Ausgleichskegelrads?|Ausgleichskegelrad","Ausgleichskegelräder","Kleine Kegelräder im Differential. Sie stehen geradeaus still und drehen sich in Kurven, um die Drehzahlen auszugleichen.","l8"],
+ ["achsrad","Achswellenrädern?|Achswellenrads?|Achswellenrad","Achswellenräder","Die beiden Kegelräder im Differential, an denen die Achswellen zu den Rädern hängen.","l8"],
+ ["sperre","Differenzialsperren?|Differentialsperren?","Differenzialsperre","Verbindet beide Seiten des Differentials fest. Dann drehen beide Räder gleich, auch wenn eines auf Eis steht.","l8"],
+ ["kuehlung","Kühlung|Kühlsystems?","Kühlung","Führt die überschüssige Wärme vom Motor ab, mit Kühlmittel und Kühler oder mit Luft und Gebläse.","l9"],
+ ["wasserpumpe","Wasserpumpen?","Wasserpumpe","Pumpt das Kühlmittel durch Motor und Kühler. Sie wird meist über einen Riemen vom Motor angetrieben.","l9"],
+ ["luefter","Lüftern?|Lüfters","Lüfter","Ein Ventilator am Kühler. Er zieht Luft hindurch, wenn der Fahrtwind fehlt, zum Beispiel im Stau.","l9"],
+ ["ausgleichsbehaelter","Ausgleichsbehälters?|Ausgleichsbehälter","Ausgleichsbehälter","Ein Behälter im Kühlsystem, der Kühlmittel aufnimmt, wenn es sich beim Erwärmen ausdehnt. Daran prüfst du den Kühlmittelstand.","l9"],
+ ["betriebstemp","Betriebstemperatur","Betriebstemperatur","Die Temperatur, bei der der Motor am besten arbeitet, beim Kühlmittel etwa 90 °C.","l9"],
+ ["oelwanne","Ölwannen?","Ölwanne","Die Wanne unten am Motor, in der sich das Öl sammelt.","l10"],
+ ["oelpumpe","Ölpumpen?","Ölpumpe","Saugt Öl aus der Wanne und drückt es mit Druck zu allen Lagern im Motor.","l10"],
+ ["oelfilter","Ölfiltern?|Ölfilters?","Ölfilter","Hält Schmutz und Abrieb aus dem Öl fest. Wird beim Ölwechsel mit getauscht.","l10"],
+ ["oeldruck","Öldrucks?|Öldruckleuchte","Öldruck","Der Druck, mit dem die Pumpe das Öl durch den Motor drückt. Leuchtet die rote Ölkanne, ist er zu niedrig: sofort anhalten, Motor aus.","l10"],
+ ["viskositaet","Viskosität","Viskosität","Wie zäh eine Flüssigkeit ist. Bei Motoröl wie 10W-40: erste Zahl für kalt, zweite für warm.","l10"],
+ ["lager","Kurbelwellenlagern?|Gleitlagern?|Lagern|Lager","Lager","Die Stellen, an denen sich Wellen drehen. Im Motor gleiten sie auf einem dünnen Ölfilm.","l10"],
+ ["batterie","Batterien?","Batterie","Speichert Strom mit 12 Volt, vor allem zum Starten. Voll geladen und ohne Last zeigt sie etwa 12,6 Volt.","l11"],
+ ["anlasser","Anlassers?|Anlasser","Anlasser","Ein kräftiger Elektromotor, der den Verbrennungsmotor beim Start andreht.","l11"],
+ ["lima","Lichtmaschinen?","Lichtmaschine","Ein Generator, den der Motor über einen Riemen antreibt. Er versorgt das Auto mit Strom und lädt die Batterie.","l11"],
+ ["keilriemen","Keilriemens?|Keilriemen|Riemens?","Keilriemen","Ein Gummiriemen, der vom Motor aus Lichtmaschine und oft auch Wasserpumpe antreibt.","l11"],
+ ["zuendspule","Zündspulen?","Zündspule","Macht aus den 12 Volt der Batterie viele tausend Volt für den Zündfunken.","l11"],
+ ["verteiler","Zündverteilers?|Zündverteiler|Verteilerfinger","Zündverteiler","Verteilt bei älteren Benzinern den Zündstrom nacheinander an die Zündkerzen. Innen dreht sich der Verteilerfinger.","l11"],
+ ["zuendfolge","Zündreihenfolge|Zündfolge","Zündreihenfolge","In welcher Reihenfolge die Zylinder zünden, zum Beispiel 1-3-4-2. So läuft der Motor gleichmäßig.","l11"],
+ ["zuendkabel","Zündkabeln?","Zündkabel","Dicke Kabel, die den Hochspannungsstrom zu den Zündkerzen führen.","l11"],
+ ["sicherung","Sicherungen|Sicherung|Sicherungskasten","Sicherung","Ein Schutzelement im Stromkreis. Bei Kurzschluss brennt es durch, bevor Kabel heiß werden.","l11"],
+ ["volt","Volt","Volt","Die Einheit der elektrischen Spannung. Das Bordnetz hat 12 Volt, läuft der Motor, eher 14.","l11"],
+ ["bscheibe","Bremsscheiben?","Bremsscheibe","Eine Stahlscheibe, die sich mit dem Rad dreht. Die Beläge drücken beim Bremsen dagegen.","l12"],
+ ["bsattel","Bremssattels?|Bremssättel|Bremssattel","Bremssattel","Umgreift die Bremsscheibe. Ein Kolben darin presst die Beläge an die Scheibe.","l12"],
+ ["bbelag","Bremsbelägen?|Bremsbelags?|Bremsbelag|Beläge","Bremsbelag","Die Reibflächen, die gegen Scheibe oder Trommel gedrückt werden. Sie nutzen sich ab.","l12"],
+ ["bfluessigkeit","Bremsflüssigkeit","Bremsflüssigkeit","Überträgt den Pedaldruck zu den Rädern. Zieht Wasser an, deshalb etwa alle zwei Jahre wechseln.","l12"],
+ ["hbz","Hauptbremszylinders?|Hauptbremszylinder","Hauptbremszylinder","Wandelt den Pedaldruck in Flüssigkeitsdruck um.","l12"],
+ ["bkv","Bremskraftverstärkers?|Bremskraftverstärker","Bremskraftverstärker","Verstärkt die Kraft am Pedal mit Unterdruck vom Motor.","l12"],
+ ["trommel","Trommelbremsen?","Trommelbremse","Bremse mit einer drehenden Trommel, gegen die innen Bremsbacken drücken. Oft hinten bei älteren Autos.","l12"],
+ ["feder","Federn|Feder","Feder","Eine Stahlfeder zwischen Rad und Karosserie. Sie fängt Stöße von der Straße ab.","l13"],
+ ["daempfer","Stoßdämpfern?|Stoßdämpfers?|Stoßdämpfer|Dämpfer","Stoßdämpfer","Bremst das Nachschwingen der Feder. Ohne ihn wippt das Auto lange nach.","l13"],
+ ["lenkgetriebe","Lenkgetriebes?|Lenkgetriebe","Lenkgetriebe","Wandelt die Drehung des Lenkrads in eine Seitwärtsbewegung für die Räder um.","l13"],
+ ["zahnstange","Zahnstangen?","Zahnstange","Eine gerade Stange mit Zähnen im Lenkgetriebe. Ein Zahnrad am Lenkrad schiebt sie nach links oder rechts.","l13"],
+ ["spurstange","Spurstangen?","Spurstange","Verbindet Lenkgetriebe und Rad und lenkt es.","l13"],
+ ["servo","Servolenkung","Servolenkung","Hilft beim Lenken, meist mit Hydraulik oder einem Elektromotor.","l13"],
+ ["spur","Spur","Spur","Wie stark die Räder von oben gesehen nach innen oder außen zeigen.","l13"],
+ ["sturz","Sturz","Sturz","Wie schräg die Räder von vorne gesehen stehen.","l13"],
+ ["vermessung","Achsvermessung","Achsvermessung","Messen und Einstellen von Spur und Sturz in der Werkstatt.","l13"],
+ ["profil","Profiltiefe|Reifenprofil","Profiltiefe","Wie tief die Rillen im Reifen sind. In Deutschland mindestens 1,6 mm.","l13"],
+ ["motorkenn","Motorkennbuchstaben","Motorkennbuchstaben","Ein Buchstabencode, der bei VW und Audi auf dem Motorblock eingeschlagen ist. Er zeigt genau, welcher Motor das ist.",null],
+ ["kardanwelle","Kardanwelle|Antriebswelle","Kardanwelle","Lange Welle, die die Drehung vom Getriebe zum Differential bringt, wenn Motor und angetriebene Achse weit auseinander liegen.","l1"],
+ ["achswelle","Achswellen?","Achswelle","Kurze Welle vom Differential zum einzelnen Rad.","l1"],
+ ["kolben","Kolbens?","Kolben","Ein dicht schließender Zylinder aus Metall, der im Motor auf und ab läuft. Der Verbrennungsdruck drückt ihn nach unten.","l2"],
+ ["zylinderkopfdichtung","Zylinderkopfdichtungen?","Zylinderkopfdichtung","Dichtung zwischen Motorblock und Zylinderkopf. Ist sie undicht, verliert der Motor Druck, Kühlmittel oder Öl.",null],
+ ["zylinderkopf","Zylinderköpfen?|Zylinderkopfs?","Zylinderkopf","Der Deckel oben auf den Zylindern. Darin sitzen die Ventile und die Zünd- oder Glühkerzen.","l3"],
+ ["zylinder","Zylindern?|Zylinders","Zylinder","Das Rohr im Motor, in dem der Kolben läuft und der Kraftstoff verbrennt. Viele Motoren haben 4, 5 oder 6 davon.","l2"],
+ ["pleuel","Pleuelstangen?|Pleuels?","Pleuelstange","Verbindet den Kolben mit der Kurbelwelle, wie dein Bein mit dem Fahrradpedal.","l2"],
+ ["kurbelwelle","Kurbelwellen?","Kurbelwelle","Eine Welle mit versetzten Zapfen. Die Pleuel drücken darauf, und so wird aus dem Auf und Ab der Kolben eine Drehung.","l2"],
+ ["nockenwelle","Nockenwellen?","Nockenwelle","Eine Welle mit Buckeln (Nocken), die die Ventile im richtigen Moment aufdrücken. Sie wird vom Zahnriemen oder einer Kette angetrieben.",null],
+ ["ventilspiel","Ventilspiels?","Ventilspiel","Ein kleiner Spalt im Ventiltrieb, damit die Ventile auch bei Hitze sicher schließen. Bei älteren Motoren muss man ihn regelmäßig einstellen.",null],
+ ["einlass","Einlassventile?","Einlassventil","Öffnet beim Ansaugen und lässt Luft oder Gemisch in den Zylinder.","l3"],
+ ["auslass","Auslassventile?","Auslassventil","Öffnet beim Ausstoßen und lässt das Abgas zum Auspuff.","l3"],
+ ["ventil","Ventilen?|Ventile","Ventile","Klappen oben im Zylinder. Sie öffnen und schließen im Takt und steuern, was hinein- und hinausströmt.","l3"],
+ ["zuendkerze","Zündkerzen?","Zündkerze","Erzeugt im Benzinmotor den Funken, der das Gemisch entzündet.","l4"],
+ ["gluehkerze","Glühkerzen?","Glühkerze","Ein Heizstab im Diesel, der den Brennraum beim Kaltstart vorwärmt. Deshalb das Vorglühen.","l4"],
+ ["duese","Einspritzdüsen?","Einspritzdüse","Spritzt den Kraftstoff fein zerstäubt ein, beim Diesel direkt in die heiße Luft im Zylinder.","l4"],
+ ["hubraum","Hubraums?","Hubraum","Der Raum, den alle Kolben zwischen OT und UT überstreichen, zusammengezählt. Angabe in cm³ oder Litern, im Fahrzeugschein unter P.1.","l2"],
+ ["ot","OT|oberer Totpunkt|oberen Totpunkt","OT (oberer Totpunkt)","Der höchste Punkt, den der Kolben erreicht. Dort kehrt er um.","l2"],
+ ["ut","UT|unterer Totpunkt|unteren Totpunkt","UT (unterer Totpunkt)","Der tiefste Punkt des Kolbens, bevor er wieder nach oben geht.","l2"],
+ ["takt","Viertakts?|Takten?|Takts?|Arbeitstakts?","Viertakt","Der Ablauf im Motor in vier Schritten: Ansaugen, Verdichten, Arbeiten, Ausstoßen. Dafür dreht sich die Kurbelwelle zweimal.","l3"],
+ ["verdichtung","Verdichtung|Verdichten|verdichtet|verdichten","Verdichtung","Das Zusammendrücken von Luft oder Gemisch im Zylinder. 10:1 heißt: auf ein Zehntel des Volumens.","l3"],
+ ["gemisch","Gemischs?","Gemisch","Luft und fein verteilter Kraftstoff, die zusammen verbrennen.","l3"],
+ ["fremdzuendung","Fremdzündung","Fremdzündung","Die Zündung kommt von außen, durch den Funken der Zündkerze. So arbeitet der Benziner.","l4"],
+ ["selbstzuendung","Selbstzündung|Selbstzünder","Selbstzündung","Der Kraftstoff entzündet sich von allein, weil die verdichtete Luft so heiß ist. So arbeitet der Diesel.","l4"],
+ ["drehzahl","Drehzahl(?:en|bereich)?|U/min","Drehzahl","Wie oft sich die Kurbelwelle pro Minute dreht, in U/min. Im Leerlauf etwa 800, auf der Autobahn oft 2500 bis 3500.",null],
+ ["kw","Kurbelwinkel|° KW","Kurbelwinkel","Wie weit sich die Kurbelwelle gedreht hat, in Grad. Ein voller Viertakt-Ablauf dauert 720° KW.","l3"],
+ ["leistung","kW|PS","kW und PS","Einheiten für die Leistung. 1 kW sind etwa 1,36 PS. Im Fahrzeugschein steht die Leistung unter P.2 in kW.",null],
+ ["boxer","Boxermotors?|Boxers?|Wasserboxers?|Luftboxers?|Boxer-Vierzylinder|Boxer-Sechszylinder","Boxermotor","Motor mit flach gegenüberliegenden Zylindern. Die Kolben bewegen sich gleichzeitig nach außen und innen.","m:boxer"],
+ ["reihe","Reihenmotors?|Reihenmotoren|Reihen-Vierzylinder|Reihen-Sechszylinder","Reihenmotor","Alle Zylinder stehen hintereinander in einer Reihe.","m:reihe"],
+ ["vmotor","V-Motors?|V6","V-Motor","Zwei Zylinderreihen schräg zueinander, wie ein V, auf einer gemeinsamen Kurbelwelle.","m:v"],
+ ["benziner","Benziners?|Benzinmotors?|Ottomotor","Benziner","Verbrennungsmotor für Benzin, gezündet von der Zündkerze.","m:benziner"],
+ ["diesel","Diesels?|Turbodiesel|Dieselmotors?","Diesel","Verbrennungsmotor, der Diesel durch die Hitze der stark verdichteten Luft entzündet.","m:diesel"],
+ ["turbo","Turbos?|TDI","Turbo","Ein Turbolader nutzt das Abgas, um ein Rad anzutreiben, das mehr Luft in den Motor drückt. Mehr Luft heißt mehr Leistung. TDI steht bei VW und Audi für Turbodiesel mit Direkteinspritzung.",null],
+ ["stator","Stators?","Stator","Der feste Teil des Elektromotors mit den Spulen. Er erzeugt ein Magnetfeld, das sich im Kreis bewegt.","m:elektro"],
+ ["rotor","Rotors?","Rotor","Der drehende Teil des Elektromotors. Er folgt dem wandernden Magnetfeld des Stators.","m:elektro"],
+ ["akku","Akkus?","Akku","Großer wiederaufladbarer Energiespeicher im Elektroauto.","m:elektro"],
+ ["allrad","Allrad|Allradantrieb|quattro|Syncro|syncro","Allrad","Alle vier Räder werden angetrieben. Bei Audi heißt das quattro, bei VW Syncro.",null],
+ ["front","Frontantriebs?","Frontantrieb","Die Vorderräder werden angetrieben. Motor und Getriebe sitzen meist vorne zusammen.",null],
+ ["heck","Hinterradantriebs?","Hinterradantrieb","Die Hinterräder werden angetrieben, entweder mit Motor vorne und Kardanwelle oder mit Motor hinten.",null],
+ ["heckmotor","Heckmotors?","Heckmotor","Der Motor sitzt hinten, wie beim T3, Käfer oder Porsche 911.",null],
+ ["laengs","längs eingebaut|längs","Längs eingebaut","Die Kurbelwelle zeigt in Fahrtrichtung.",null],
+ ["quer","quer eingebaut|quer","Quer eingebaut","Die Kurbelwelle liegt quer zur Fahrtrichtung. Das spart Platz, typisch bei Kompaktwagen wie dem Golf.",null],
+ ["kuehler","Kühlers?","Kühler","Ein Gitter aus dünnen Röhrchen vorne am Auto. Fahrtwind kühlt darin das heiße Kühlmittel ab.","l9"],
+ ["kuehlmittel","Kühlmittels?|Kühlwasser","Kühlmittel","Wasser mit Frostschutz, das durch den Motor fließt, die Wärme aufnimmt und zum Kühler bringt.","l9"],
+ ["luftkuehlung","Luftgekühlter|luftgekühlten?|luftgekühlt","Luftgekühlt","Der Motor wird nicht mit Wasser, sondern mit Luft gekühlt. Ein Gebläse bläst Luft über Rippen an den Zylindern.","l9"],
+ ["geblaese","Gebläses?","Gebläse","Ein Lüfterrad am luftgekühlten Motor, das Kühlluft über die Zylinder bläst.","l9"],
+ ["entlueften","[Ee]ntlüften","Entlüften","Luftblasen aus dem Kühlsystem holen. Bleibt Luft drin, kühlt der Motor stellenweise schlecht und kann überhitzen.","l9"],
+ ["thermostat","Thermostats?","Thermostat","Ein Ventil im Kühlsystem. Es öffnet den Weg zum Kühler erst, wenn der Motor warm ist.","l9"],
+ ["zahnriemen","Zahnriemens?","Zahnriemen","Gummiriemen mit Zähnen, der die Nockenwelle mit der Kurbelwelle im Takt hält. Reißt er, können Ventile und Kolben zusammenstoßen.",null],
+ ["schweller","Schwellern?|Schweller","Schweller","Der Längsträger unter den Türen. Ein typischer Roststelle bei alten Autos.",null],
+ ["radlauf","Radläufen?|Radlauf","Radlauf","Die Blechkante rund um das Rad. Dort sammelt sich Dreck und Feuchtigkeit, deshalb rostet sie gern.",null],
+ ["verzinkt","vollverzinkt|verzinkt|Verzinkung","Verzinkt","Das Blech ist mit Zink überzogen. Zink schützt den Stahl darunter vor Rost.",null],
+ ["fahrwerk","Fahrwerks?","Fahrwerk","Alles, was das Auto mit der Straße verbindet: Federn, Stoßdämpfer, Lenkung, Achsen und Lager.",null],
+ ["gummilager","Gummilagern?|Gummilager","Gummilager","Gummipuffer, mit denen Achsteile und Motor an der Karosserie befestigt sind. Sie dämpfen Stöße und werden mit dem Alter hart und rissig.",null],
+ ["schwerpunkt","Schwerpunkts?","Schwerpunkt","Der Punkt, an dem das Gewicht des Autos im Mittel sitzt. Je tiefer, desto stabiler liegt das Auto in Kurven.","m:boxer"],
+ ["fahrzeugschein","Fahrzeugscheins?","Fahrzeugschein","Offiziell Zulassungsbescheinigung Teil I. Wichtige Felder: P.1 Hubraum, P.2 Leistung in kW, P.3 Kraftstoff.",null],
+ ["messstab","Ölmessstabs?|Messstabs?","Ölmessstab","Ein langer Metallstab, der in die Ölwanne reicht. Daran liest du zwischen Min und Max ab, ob genug Öl im Motor ist.",null]
+];
+const LETTER="A-Za-zÄÖÜäöüß";
+const GRE=new RegExp(`(?<![${LETTER}])(?:${GL.map(g=>"("+g[1]+")").join("|")})(?![${LETTER}])`,"g");
+const GBY=Object.fromEntries(GL.map(g=>[g[0],g]));
+const GSKIP="h1,h2,h3,button,a,.chip,.label,.opt,.hud,.seg,dt,summary,.gpop h3";
+function gloss(root,skipKey){
+  if(!root)return;const seen=new Set(skipKey?[skipKey]:[]);
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement&&n.parentElement.closest(GSKIP)?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+  const nodes=[];while(w.nextNode())nodes.push(w.currentNode);
+  for(const n of nodes){const t=n.nodeValue;GRE.lastIndex=0;let m,last=0,frag=null;
+    while((m=GRE.exec(t))){const gi=m.findIndex((x,i)=>i>0&&x!==undefined);const key=GL[gi-1][0];if(seen.has(key))continue;seen.add(key);
+      frag=frag||document.createDocumentFragment();frag.append(t.slice(last,m.index));
+      const b=document.createElement("button");b.className="term";b.dataset.term=key;b.textContent=m[0];frag.append(b);last=m.index+m[0].length}
+    if(frag){frag.append(t.slice(last));n.replaceWith(frag)}}
+}
+function findTerm(text){GRE.lastIndex=0;const m=GRE.exec(text);if(!m)return null;const gi=m.findIndex((x,i)=>i>0&&x!==undefined);return GL[gi-1][0]}
+let IN_LESSON=false;
+function openTerm(key){
+  const g=GBY[key];if(!g)return;document.querySelector(".gback")?.remove();
+  let link="";
+  if(g[4]&&!IN_LESSON){if(g[4].startsWith("m:")){const m=MOTORS[g[4].slice(2)];link=`<button class="btn ghost" data-go="${g[4]}">Mehr: ${m.name}</button>`}
+    else if(LESSONS[g[4]]&&lessonState(g[4])!=="locked")link=`<button class="btn ghost" data-go="${g[4]}">Lektion: ${LESSONS[g[4]].title}</button>`}
+  const bk=document.createElement("div");bk.className="gback";
+  bk.innerHTML=`<div class="gpop" role="dialog" aria-label="${esc(g[2])}"><div class="label">Lexikon</div><h3>${esc(g[2])}</h3><p>${esc(g[3])}</p><div class="row">${link}<button class="btn" data-close>Verstanden</button></div></div>`;
+  document.body.append(bk);gloss(bk.querySelector("p"),key);
+  bk.addEventListener("click",e=>{
+    const t=e.target.closest(".term");if(t){e.stopPropagation();openTerm(t.dataset.term);return}
+    const go=e.target.closest("[data-go]");if(go){bk.remove();const v=go.dataset.go;v.startsWith("m:")?openMotor(v.slice(2)):openLesson(v);return}
+    if(e.target===bk||e.target.closest("[data-close]"))bk.remove()});
+  bk.querySelector("[data-close]").focus();
+}
+document.addEventListener("click",e=>{const t=e.target.closest(".term");if(t&&!t.closest(".gback")){e.preventDefault();openTerm(t.dataset.term)}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelector(".gback")?.remove()});
+
+/* ============ VIEWS ============ */
+let TAB="learn";
+const view=$("#view");
+function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),1800)}
+function setTab(t){TAB=t;document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t));render()}
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{closeSheet(true);setTab(b.dataset.tab)}));
+function render(){killScene();window.scrollTo(0,0);({learn:renderLearn,motors:renderMotors,garage:renderGarage})[TAB]()}
+
+function lessonState(id){if(S.done.includes(id))return"done";const i=ORDER.indexOf(id);if(i<0)return"soon";if(i===0||S.done.includes(ORDER[i-1]))return"current";return"locked"}
+function renderLearn(){
+  const next=ORDER.find(id=>!S.done.includes(id));
+  const doneN=S.done.filter(id=>LESSONS[id]).length;
+  let h=`<section class="hero"><div class="stage" id="hero-stage"></div><div class="hero-txt"><div><div class="label">Dein Lernpfad</div><h1>Wie ein Auto funktioniert</h1></div><span class="chip holo">${doneN}/${ORDER.length} Lektionen</span></div></section>`;
+  UNITS.forEach(u=>{
+    const avail=u.lessons.some(id=>LESSONS[id]);
+    h+=`<section class="unit"><div class="unit-head"><div><div class="label">${u.sub}</div><h2>${u.name}</h2></div>${avail?"":'<span class="chip">bald</span>'}</div><div class="path">`;
+    u.lessons.forEach((id,i)=>{
+      const st=lessonState(id),off=[0,-60,40,-30,55][i%5];
+      const name=LESSONS[id]?LESSONS[id].title:SOON[id];
+      const icon=st==="done"?"✓":st==="locked"||st==="soon"?"🔒︎":String(ORDER.indexOf(id)+1);
+      h+=`<button class="node ${st} ${st==="soon"?"locked":""}" style="transform:translateX(${off}px)" data-lesson="${id}" ${st==="locked"||st==="soon"?'aria-disabled="true"':""}><span class="dot">${st==="locked"||st==="soon"?'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>':icon}</span><span class="nm">${esc(name)}${st==="current"?"<br><span class='chip holo' style='margin-top:4px'>Start</span>":""}</span></button>`;
+    });
+    h+=`</div></section>`;
+  });
+  const pool=ORDER.filter(id=>S.done.includes(id));
+  h+=`<section class="sec"><div class="unit-head"><div><div class="label">Wiederholen</div><h2>Übungsrunde</h2></div><button class="chip holo" id="prac" ${pool.length?"":"disabled"} style="padding:8px 14px;font-size:12px">${pool.length?"6 Fragen starten":"nach Lektion 1"}</button></div><p style="margin:8px 2px 0;font-size:13.5px">Zufällige Fragen aus allen Lektionen, die du schon geschafft hast. Gibt zusätzliche XP.</p></section>
+  <section class="sec" style="text-align:center"><button class="chip" id="reset" style="padding:8px 14px">Fortschritt zurücksetzen</button></section>`;
+  view.innerHTML=h;
+  $("#prac").onclick=()=>{if(!pool.length)return;const qs=pool.flatMap(id=>LESSONS[id].steps.filter(x=>x.q));for(let i=qs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[qs[i],qs[j]]=[qs[j],qs[i]]}openLesson("practice",{title:"Übungsrunde",steps:qs.slice(0,6)})};
+  const rb=$("#reset");rb.onclick=()=>{if(rb.dataset.armed){S=JSON.parse(JSON.stringify(defaults));save();render();toast("Fortschritt zurückgesetzt")}else{rb.dataset.armed=1;rb.textContent="Wirklich? Nochmal tippen";rb.classList.add("amber");setTimeout(()=>{if(rb.isConnected){delete rb.dataset.armed;rb.textContent="Fortschritt zurücksetzen";rb.classList.remove("amber")}},3500)}};
+  mountScene($("#hero-stage"),"engine",{layout:"inline4"});if(ACTIVE){ACTIVE.stage.st.dist=5.4;ACTIVE.stage.st.lookY=-.2}
+  ACTIVE&&ACTIVE.el.querySelector(".ctrl")?.remove();
+  view.querySelectorAll("[data-lesson]").forEach(b=>b.addEventListener("click",()=>{const st=lessonState(b.dataset.lesson);if(st==="locked"){toast("Schließ zuerst die vorige Lektion ab");return}if(st==="soon"){toast("Kommt im nächsten Prototyp");return}openLesson(b.dataset.lesson)}));
+}
+
+const GLYPH={
+ benziner:'<path d="M12 3v4M8 7h8l-1 4H9z"/><path d="M12 11v3"/><path d="M10 17l2-3 2 3-2 4z"/>',
+ diesel:'<rect x="7" y="4" width="10" height="16" rx="2"/><path d="M7 9h10M10 13l2 3 2-3"/>',
+ elektro:'<path d="M13 3L6 13h5l-1 8 7-10h-5z"/>',
+ reihe:'<rect x="3" y="6" width="4" height="8"/><rect x="8.5" y="6" width="4" height="8"/><rect x="14" y="6" width="4" height="8"/><path d="M2 18h18"/>',
+ boxer:'<rect x="2" y="8" width="7" height="5"/><rect x="15" y="8" width="7" height="5"/><circle cx="12" cy="10.5" r="2"/>',
+ v:'<path d="M5 4l5 10M19 4l-5 10"/><rect x="3" y="3" width="5" height="4" transform="rotate(-25 5 5)"/><rect x="16" y="3" width="5" height="4" transform="rotate(25 19 5)"/><circle cx="12" cy="16" r="2.4"/>'
+};
+function renderMotors(){
+  const card=id=>{const m=MOTORS[id];return `<button class="card" data-motor="${id}"><svg class="glyph" viewBox="0 0 24 24">${GLYPH[id]}</svg><h3>${m.name}</h3><p>${m.lede}</p></button>`};
+  view.innerHTML=`<section class="sec"><div class="label">Motorenwelt</div><h2>Was wird verbrannt, wie wird gezündet?</h2><p>Die erste Frage bei jedem Motor: Was treibt ihn an?</p><div class="grid">${["benziner","diesel","elektro"].map(card).join("")}</div></section>
+  <section class="sec"><h2>Wie liegen die Zylinder?</h2><p>Die zweite Frage, unabhängig von der ersten. Ein Boxer kann zum Beispiel Benzin oder Diesel verbrennen.</p><div class="grid">${["reihe","boxer","v"].map(card).join("")}</div></section>
+  <section class="sec"><h2>Lexikon</h2><p>Alle Fachbegriffe der App. Tippe einen an, dann kommt die Erklärung. Im Text erkennst du sie an der gepunkteten Linie.</p><div class="lex">${GL.slice().sort((a,b)=>a[2].localeCompare(b[2],"de")).map(g=>`<button class="term" data-term="${g[0]}">${esc(g[2])}</button>`).join("")}</div></section>`;
+  view.querySelectorAll("[data-motor]").forEach(b=>b.addEventListener("click",()=>openMotor(b.dataset.motor)));
+}
+const PIN='<svg viewBox="0 0 24 24"><path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 16.6 6.5 19.5l1-6.3L3 8.9 9 8z"/></svg>';
+function carSub(id){const c=CARS[id];const vi=S.variant[id];const v=vi!=null?c.variants[vi]:null;return v&&c.variants.length>1?`${v.n} · ${c.years}`:`${c.years} · ${c.body}`}
+function renderGarage(q=""){
+  const pinned=S.pinned.filter(id=>CARS[id]);
+  const list=Object.keys(CARS).filter(id=>(CARS[id].name+" "+(CARS[id].nick||"")+" "+CARS[id].body).toLowerCase().includes(q.toLowerCase()));
+  view.innerHTML=`<section class="sec"><div class="label">Meine Garage</div><h2>Angepinnte Autos</h2><div class="garage" style="margin-top:10px">${pinned.length?pinned.map(id=>`<button class="gcard" data-car="${id}"><span class="label" style="color:var(--amber)">★ angepinnt</span><h3>${CARS[id].name}</h3><span class="sub">${esc(carSub(id))}</span></button>`).join(""):'<div class="empty" style="grid-column:1/-1">Noch leer. Tippe unten in der Datenbank auf den Stern, um ein Auto anzupinnen.</div>'}</div></section>
+  <section class="sec"><h2>Autodatenbank</h2><p>Such dir ein Auto aus und schau, was du vor dir hast.</p><input class="search" id="q" type="search" placeholder="Auto suchen, z. B. Golf" value="${esc(q)}" aria-label="Auto suchen"><div id="carlist">${list.map(id=>`<div class="car-row"><button class="info" data-car="${id}" style="text-align:left"><h3>${CARS[id].name}${CARS[id].nick?` <span class="muted" style="font-size:15px">„${CARS[id].nick}“</span>`:""}</h3><div class="sub">${CARS[id].years} · ${CARS[id].body}</div></button><button class="pin" data-pin="${id}" aria-pressed="${S.pinned.includes(id)}" aria-label="Anpinnen">${PIN}</button></div>`).join("")||'<div class="empty">Kein Auto gefunden. Weitere Autos kommen in den nächsten Versionen dazu.</div>'}</div></section>`;
+  view.querySelectorAll("[data-car]").forEach(b=>b.addEventListener("click",()=>openCar(b.dataset.car)));
+  view.querySelectorAll("[data-pin]").forEach(b=>b.addEventListener("click",()=>{togglePin(b.dataset.pin);renderGarage($("#q").value)}));
+  const qi=$("#q");qi.addEventListener("input",()=>{const v=qi.value,pos=qi.selectionStart;renderGarage(v);const n=$("#q");n.focus();n.setSelectionRange(pos,pos)});
+}
+function togglePin(id){const i=S.pinned.indexOf(id);if(i>=0){S.pinned.splice(i,1);toast(CARS[id].name+" aus der Garage entfernt")}else{S.pinned.push(id);toast(CARS[id].name+" angepinnt")}save()}
+
+/* ============ SHEETS ============ */
+let SHEET=null;
+function openSheet(html){closeSheet(true);IN_LESSON=false;killScene();const d=document.createElement("div");d.className="sheet";d.innerHTML=`<div class="sheet-in">${html}</div>`;document.body.append(d);document.body.style.overflow="hidden";SHEET=d;return d}
+function closeSheet(silent){IN_LESSON=false;document.querySelector(".gback")?.remove();if(!SHEET)return;killScene();SHEET.remove();document.querySelectorAll(".foot").forEach(f=>f.remove());SHEET=null;document.body.style.overflow="";if(!silent)render()}
+const XSVG='<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+const BACK='<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>';
+
+function openLesson(id,custom){
+  const L=custom||LESSONS[id];const steps=L.steps.map(s=>({...s}));let i=0,firstTry=0,quizN=steps.filter(s=>s.q).length;
+  const d=openSheet(`<div class="sheet-top"><button class="x" id="lx" aria-label="Lektion schließen">${XSVG}</button><div class="bar"><i id="lbar" style="width:0"></i></div></div><div class="stage" id="lstage" hidden></div><div id="lbody" class="step"></div>`);
+  const foot=document.createElement("div");foot.className="foot";foot.innerHTML='<div class="foot-in"><div class="fb" id="fb" hidden></div><button class="btn" id="go">Weiter</button></div>';document.body.append(foot);
+  IN_LESSON=true;$("#lx").onclick=()=>closeSheet();
+  const stageEl=$("#lstage"),body=$("#lbody"),go=$("#go"),fb=$("#fb");
+  let curKey=null;
+  function show(){
+    const s=steps[i];$("#lbar").style.width=(i/steps.length*100)+"%";foot.className="foot";fb.hidden=true;d.scrollTop=0;
+    if(s.scene){const key=s.scene+JSON.stringify(s.opts||{});stageEl.hidden=false;if(key!==curKey){mountScene(stageEl,s.scene,s.opts);curKey=key}}
+    else if(!s.q){stageEl.hidden=true;killScene();curKey=null}
+    if(s.q){
+      body.innerHTML=`<div class="label" style="margin-top:14px">${s.retry?"Noch mal":"Frage"}</div><h2>${esc(s.q)}</h2><div class="opts">${s.o.map((o,k)=>`<button class="opt" data-k="${k}" aria-pressed="false">${esc(o)}</button>`).join("")}</div>`;
+      let sel=-1;go.textContent="Prüfen";go.disabled=true;
+      body.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{if(go.dataset.mode==="next")return;sel=+b.dataset.k;body.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-pressed",x===b));go.disabled=false});
+      go.dataset.mode="check";
+      go.onclick=()=>{if(go.dataset.mode==="check"){const ok=sel===s.a;body.querySelectorAll(".opt").forEach(x=>{const k=+x.dataset.k;if(k===s.a)x.classList.add("right");else if(k===sel)x.classList.add("wrong")});
+          foot.className="foot "+(ok?"good":"bad");fb.hidden=false;fb.innerHTML=`<b>${ok?["Richtig!","Genau so.","Sitzt!"][i%3]:"Nicht ganz."}</b><span>${esc(s.e)}</span>`;gloss(fb.querySelector("span"));
+          if(ok&&!s.retry)firstTry++;if(!ok&&!s.retry)steps.push({...s,retry:true});
+          go.dataset.mode="next";go.textContent="Weiter"}
+        else next()};
+    }else{
+      body.innerHTML=`<h2>${esc(s.h)}</h2>${s.t}`;gloss(body);go.textContent=i===steps.length-1?"Fertig":"Weiter";go.disabled=false;go.dataset.mode="";go.onclick=next;
+    }
+  }
+  function next(){i++;if(i>=steps.length)finish();else show()}
+  function finish(){
+    killScene();stageEl.hidden=true;$("#lbar").style.width="100%";
+    const prac=id==="practice",first=!prac&&!S.done.includes(id);const gain=prac?5+firstTry:first?10+firstTry*2:3;
+    if(first)S.done.push(id);S.xp+=gain;
+    const today=dayStr(new Date()),y=new Date();y.setDate(y.getDate()-1);
+    if(S.lastDay!==today){S.streak=S.lastDay===dayStr(y)?S.streak+1:1;S.lastDay=today}save();
+    const nx=ORDER.find(x=>!S.done.includes(x));
+    body.innerHTML=`<div class="done-wrap"><div class="label">${prac?"Übungsrunde geschafft":"Lektion geschafft"}</div><div class="big">+${gain} XP</div><p style="margin:14px auto;max-width:34ch">${esc(L.title)}: ${firstTry} von ${quizN} Fragen auf Anhieb richtig.</p><span class="chip amber">▲ ${S.streak} ${S.streak===1?"Tag":"Tage"} in Folge</span></div>`;
+    go.textContent="Zum Lernpfad";if(!nx&&!prac)body.querySelector(".done-wrap").insertAdjacentHTML("beforeend","<p style='margin-top:18px'>Das war die letzte Lektion. Du hast den ganzen Lernpfad geschafft.</p>");go.onclick=()=>closeSheet();foot.className="foot good";fb.hidden=true;
+  }
+  show();
+}
+
+function openMotor(id){
+  const m=MOTORS[id];
+  const cars=m.cars.filter(c=>CARS[c]).map(c=>`<button class="chip holo" data-car="${c}">${CARS[c].name}</button>`).join("");
+  const d=openSheet(`<div class="sheet-top"><button class="x" id="mx" aria-label="Zurück">${BACK}</button><span class="label">Motorenwelt</span></div>
+   <div class="detail"><h1>${m.name}</h1><p class="lede">${m.lede}</p><div class="stage" id="mstage"></div>
+   <div class="sec"><h2>So funktioniert er</h2><p style="color:var(--fg)">${m.how}</p><dl class="spec">${m.spec.map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join("")}</dl></div>
+   <div class="sec"><div class="pros"><div><b style="color:var(--ok)">Stärken</b><ul>${m.pro.map(x=>`<li>${x}</li>`).join("")}</ul></div><div><b style="color:var(--bad)">Schwächen</b><ul>${m.con.map(x=>`<li>${x}</li>`).join("")}</ul></div></div></div>
+   ${cars?`<div class="sec"><h2>Steckt zum Beispiel in</h2><div class="chips">${cars}</div></div>`:""}
+   ${m.lesson?`<div class="sec"><button class="btn ghost" data-lesson="${m.lesson}">Passende Lektion: ${LESSONS[m.lesson].title}</button></div>`:""}</div>`);
+  $("#mx").onclick=()=>closeSheet();gloss(d.querySelector(".detail"));
+  mountScene($("#mstage"),m.scene,m.opts);
+  d.querySelectorAll("[data-car]").forEach(b=>b.onclick=()=>openCar(b.dataset.car));
+  d.querySelectorAll("[data-lesson]").forEach(b=>b.onclick=()=>{const st=lessonState(b.dataset.lesson);if(st==="locked"){toast("Diese Lektion ist noch gesperrt");return}openLesson(b.dataset.lesson)});
+}
+
+function openCar(id){
+  const c=CARS[id];let vi=S.variant[id]!=null?S.variant[id]:0;
+  const d=openSheet(`<div class="sheet-top"><button class="x" id="cx" aria-label="Zurück">${BACK}</button><span class="label" style="flex:1">${c.body}</span><button class="pin" id="cpin" aria-pressed="${S.pinned.includes(id)}" aria-label="Anpinnen">${PIN}</button></div><div class="detail" id="cbody"></div>`);
+  $("#cx").onclick=()=>closeSheet();
+  $("#cpin").onclick=e=>{togglePin(id);e.currentTarget.setAttribute("aria-pressed",S.pinned.includes(id))};
+  function draw(){
+    const v=c.variants[vi],m=MOTORS[v.motor];
+    const fuelCard=/Diesel/.test(v.fuel)&&!/Benzin/.test(v.fuel)?"diesel":/Benzin/.test(v.fuel)&&!/Diesel/.test(v.fuel)?"benziner":null;
+    $("#cbody").innerHTML=`<h1>${c.name}${c.nick?` <span class="muted" style="font-size:22px">„${c.nick}“</span>`:""}</h1><p class="lede">${c.years} · ${c.intro}</p>
+    ${c.variants.length>1?`<div class="label">Welche Version hast du?</div><div class="seg">${c.variants.map((x,k)=>`<button data-v="${k}" aria-pressed="${k===vi}">${x.n} <span class="muted" style="font-size:11px">${x.y}</span></button>`).join("")}</div>`:""}
+    <div class="stage" id="cstage"></div>
+    <div class="sec"><h2>Was du vor dir hast</h2><dl class="spec">
+      <dt>Motor</dt><dd><a class="link" data-motor="${v.motor}">${ENGNAME[v.eng]}</a>${v.eng==="v6"?"":""}</dd>
+      <dt>Kraftstoff</dt><dd>${fuelCard?`<a class="link" data-motor="${fuelCard}">${v.fuel}</a>`:v.fuel}</dd>
+      <dt>Hubraum</dt><dd>${v.size}</dd><dt>Leistung</dt><dd>${v.power}</dd>
+      <dt>Kühlung</dt><dd>${v.cool}</dd><dt>Getriebe</dt><dd>${c.gearbox}</dd><dt>Antrieb</dt><dd>${c.driveText}</dd></dl>
+      <p class="muted" style="font-size:13px;margin-top:8px">Genau steht es in deinem Fahrzeugschein: P.1 Hubraum, P.2 Leistung in kW, P.3 Kraftstoff.</p></div>
+    ${c.where?`<div class="sec"><h2>Wo sitzt was?</h2><ul class="plain">${c.where.map(([a,b])=>`<li><b>${a}</b>${b}</li>`).join("")}</ul></div>`:""}
+    ${c.weak?`<div class="sec"><h2>Typische Schwachstellen</h2><ul class="plain warn">${c.weak.map(([a,b])=>`<li><b>${a}</b>${b}</li>`).join("")}</ul></div>`:""}
+    ${c.guides?`<div class="sec"><h2>Wie mache ich …</h2>${c.guides.map(g=>`<details><summary>${g.t}</summary><ol>${g.steps.map(s=>`<li>${s}</li>`).join("")}</ol>${g.t==="Ölstand prüfen"&&c.where?`<div class="note">Bei deinem ${c.name}: ${c.where.find(w=>w[0]==="Ölmessstab")[1]}</div>`:""}</details>`).join("")}</div>`:""}
+    ${c.compare?`<div class="sec"><div class="unit-head"><div><div class="label">Motor gesucht?</div><h2>Welcher Motor passt in deinen ${c.name}?</h2></div></div><button class="btn ghost" id="cmp" style="margin-top:10px">Motoren vergleichen</button></div>`:""}
+    <div class="sec"><h2>Passende Lektionen</h2><div class="chips">${c.lessons.map(l=>`<button class="chip holo" data-lesson="${l}">${LESSONS[l].title}</button>`).join("")}</div></div>`;
+    gloss($("#cbody"));mountScene($("#cstage"),"car",{car:id,v:vi});
+    d.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{vi=+b.dataset.v;S.variant[id]=vi;save();draw()});
+    const cb=d.querySelector("#cmp");if(cb)cb.onclick=()=>openCompare(id);
+    d.querySelectorAll("[data-motor]").forEach(b=>b.onclick=()=>openMotor(b.dataset.motor));
+    d.querySelectorAll("[data-lesson]").forEach(b=>b.onclick=()=>{const st=lessonState(b.dataset.lesson);if(st==="locked"){toast("Diese Lektion ist noch gesperrt");return}openLesson(b.dataset.lesson)});
+  }
+  draw();
+}
+
+
+const T3CMP=[
+ {n:"Luftgekühlter Boxer",y:"1979–1983",eng:"boxer4",kw:"1,6 l / 2,0 l · 50 bis 70 PS",cool:"Luft, Gebläse am Motor",
+  pro:["Einfach aufgebaut, keine Wasserleitungen","Kein Kühlmittel, keine Wasserpumpe","Typischer Klang, gute Teileversorgung über die Käfer- und Bus-Szene"],
+  con:["Wenig Kraft für den schweren Bus","Kann bei Last, Bergen und Hitze warm werden","Ventilspiel muss regelmäßig eingestellt werden"],
+  fit:"Einfachster Weg, wenn dein T3 ab Werk luftgekühlt war. Bei einem Bus, der ab Werk einen Wasserboxer hatte, passen Anbauteile, Heizung und Kühlluftführung nicht ohne Umbau."},
+ {n:"Wasserboxer",y:"1983–1992",eng:"boxer4",kw:"1,9 l / 2,1 l · 60 bis 112 PS",cool:"Wasser, Kühler vorne",
+  pro:["Mehr Leistung, besonders der 2,1 l","Leiser, gleichmäßige Temperatur","Bessere Heizung im Innenraum"],
+  con:["Zylinderkopfdichtungen sind eine bekannte Schwachstelle","Lange Kühlmittelleitungen, Entlüften braucht Geduld","Korrosion im Kühlsystem bei altem Kühlmittel"],
+  fit:"Einfachster Weg, wenn dein T3 ab Werk einen Wasserboxer hatte. Kühler, Leitungen und Ausgleichsbehälter sind dann schon da."},
+ {n:"Diesel / Turbodiesel",y:"1981–1992",eng:"inline4",kw:"1,6 l / 1,7 l · 50 bis 70 PS",cool:"Wasser, Kühler vorne",
+  pro:["Sparsam","Robust und langlebig","Der Turbodiesel hat spürbar mehr Durchzug als der Saugdiesel"],
+  con:["Sehr wenig Leistung für das Gewicht","Laut, langsam auf der Autobahn","Zahnriemen und Einspritzpumpe brauchen Pflege"],
+  fit:"Ein Reihenmotor statt Boxer, mit eigener Motoraufhängung und Anbauteilen. Passt am einfachsten, wenn der Bus ab Werk Diesel war."}
+];
+function openCompare(id){
+  const c=CARS[id];let sel=0;
+  const d=openSheet(`<div class="sheet-top"><button class="x" id="kx" aria-label="Zurück">${BACK}</button><span class="label">${c.name} · Motorvergleich</span></div>
+   <div class="detail"><h1>Welcher Motor für deinen ${c.name}?</h1><p class="lede">Drei Motorfamilien gab es ab Werk. Hier siehst du sie nebeneinander.</p>
+   <div class="seg" id="ksel">${T3CMP.map((m,k)=>`<button data-k="${k}" aria-pressed="${k===0}">${m.n}</button>`).join("")}</div>
+   <div class="stage small" id="kstage"></div><div id="kbody"></div>
+   <div class="sec"><h2>Bevor du einen Motor kaufst</h2><ul class="plain">
+    <li><b>Was war ab Werk drin?</b>Im Fahrzeugschein stehen Hubraum (P.1), Leistung (P.2) und Kraftstoff (P.3). Am Block selbst sind die Motorkennbuchstaben eingeschlagen.</li>
+    <li><b>Gleicher Typ ist am einfachsten</b>Ein Motor der gleichen Familie wie ab Werk passt meist ohne große Umbauten und ohne neue Eintragung.</li>
+    <li><b>Anderer Typ heißt Eintragung</b>In Deutschland muss ein anderer Motor als ab Werk in der Regel vom TÜV oder einer anderen Prüfstelle abgenommen und eingetragen werden. Frag am besten vorher dort nach, was sie brauchen.</li>
+   </ul>
+   <details><summary>Checkliste beim Motorkauf</summary><ol>
+    <li>Kompression messen lassen. Alle Zylinder sollten ähnliche Werte haben.</li>
+    <li>Wenn möglich laufen hören: kein Klopfen, kein blauer Rauch, kein weißer Dauerqualm beim Benziner.</li>
+    <li>Auf Ölverlust und beim Wasserboxer auf Spuren von Kühlmittel am Zylinderkopf achten.</li>
+    <li>Klären, welche Anbauteile dabei sind: Vergaser oder Einspritzung, Lichtmaschine, Anlasser, Kabelbaum.</li>
+    <li>Herkunft und Laufleistung schriftlich geben lassen.</li>
+    <li>Kupplung gleich mit erneuern. Besser geht man nie wieder dran.</li>
+   </ol></details></div></div>`);
+  $("#kx").onclick=()=>openCar(id);
+  function draw(){const m=T3CMP[sel];
+    d.querySelectorAll("#ksel button").forEach((b,k)=>b.setAttribute("aria-pressed",k===sel));
+    $("#kbody").innerHTML=`<dl class="spec" style="margin-top:12px"><dt>Bauzeit</dt><dd>${m.y}</dd><dt>Motor</dt><dd><a class="link" data-motor="${m.eng==="inline4"?"reihe":"boxer"}">${ENGNAME[m.eng]}</a>${m.eng==="inline4"?", Diesel":", Benzin"}</dd><dt>Hubraum</dt><dd>${m.kw}</dd><dt>Kühlung</dt><dd>${m.cool}</dd></dl>
+     <div class="pros" style="margin-top:12px"><div><b style="color:var(--ok)">Dafür</b><ul>${m.pro.map(x=>`<li>${x}</li>`).join("")}</ul></div><div><b style="color:var(--bad)">Dagegen</b><ul>${m.con.map(x=>`<li>${x}</li>`).join("")}</ul></div></div>
+     <ul class="plain warn" style="margin-top:12px"><li><b>Passt das bei mir?</b>${m.fit}</li></ul>`;
+    gloss($("#kbody"));d.querySelectorAll("#kbody [data-motor]").forEach(b=>b.onclick=()=>openMotor(b.dataset.motor));
+    mountScene($("#kstage"),"engine",{layout:m.eng});ACTIVE&&ACTIVE.el.querySelector(".ctrl")?.remove()}
+  d.querySelectorAll("#ksel button").forEach(b=>b.onclick=()=>{sel=+b.dataset.k;draw()});
+  gloss(d.querySelector(".detail > .sec"));draw();
+}
+updateStats();render();
+</script>
+
+<script>if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}</script>
+</body>
+</html>
